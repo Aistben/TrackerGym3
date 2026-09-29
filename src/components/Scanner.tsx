@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
+import { extractBarcode } from "../lib/barcode";
 import { Btn } from "./ui";
 
 export default function Scanner({ onDetect, onClose }: { onDetect: (code: string) => void; onClose: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [manual, setManual] = useState("");
+  const [warn, setWarn] = useState<string | null>(null);
   const done = useRef(false);
 
   useEffect(() => {
@@ -29,6 +31,15 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
           videoRef.current!,
           (result) => {
             if (result && !done.current) {
+              const raw = result.getText();
+              const code = extractBarcode(raw);
+              if (!code) {
+                // QR со ссылкой на сайт/промо — товара в нём нет
+                setWarn(
+                  `Считан код «${raw.slice(0, 40)}${raw.length > 40 ? "…" : ""}» — в нём нет номера товара. Наведи на полосатый штрихкод (EAN-13).`,
+                );
+                return;
+              }
               done.current = true;
               try {
                 navigator.vibrate?.(60);
@@ -36,7 +47,7 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
                 /* noop */
               }
               controls?.stop();
-              onDetect(result.getText());
+              onDetect(code);
             }
           },
         );
@@ -63,7 +74,10 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
           <div className="absolute inset-0 grid place-items-center bg-ink/85 p-6 text-center text-sm text-mute">{error}</div>
         )}
       </div>
-      <p className="text-center text-xs text-mute">Наведи камеру на штрихкод продукта</p>
+      {warn && <div className="rounded-xl border border-warn/30 bg-warn/10 p-3 text-xs text-warn">{warn}</div>}
+      <p className="text-center text-xs text-mute">
+        Наведи камеру на штрихкод продукта (EAN-13 / EAN-8 / UPC). QR распознаётся, если в нём зашит номер товара.
+      </p>
       <div className="flex gap-2">
         <input
           className="field"
@@ -72,7 +86,7 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
           value={manual}
           onChange={(e) => setManual(e.target.value.replace(/\D/g, ""))}
         />
-        <Btn disabled={manual.length < 6} onClick={() => onDetect(manual)}>
+        <Btn disabled={manual.length < 6} onClick={() => onDetect(extractBarcode(manual) ?? manual)}>
           Найти
         </Btn>
       </div>

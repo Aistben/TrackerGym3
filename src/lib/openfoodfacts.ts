@@ -1,5 +1,6 @@
 import type { Product } from "./types";
 import { uid } from "./storage";
+import { normalizeGtin } from "./barcode";
 
 const API = "https://world.openfoodfacts.org";
 
@@ -29,12 +30,25 @@ function mapProduct(p: any): Product | null {
   };
 }
 
-export async function lookupBarcode(barcode: string): Promise<Product | null> {
-  const res = await fetch(`${API}/api/v2/product/${encodeURIComponent(barcode)}.json?fields=code,product_name,product_name_ru,generic_name,brands,serving_quantity,nutriments`);
+async function fetchOne(code: string): Promise<Product | null> {
+  const res = await fetch(
+    `${API}/api/v2/product/${encodeURIComponent(code)}.json?fields=code,product_name,product_name_ru,generic_name,brands,serving_quantity,nutriments`,
+  );
   if (!res.ok) return null;
-  const data = await res.json();
-  if (data.status !== 1) return null;
+  const data = await res.json().catch(() => null);
+  if (!data || data.status !== 1) return null;
   return mapProduct(data.product);
+}
+
+export async function lookupBarcode(barcode: string): Promise<Product | null> {
+  const norm = normalizeGtin(barcode);
+  // пробуем нормализованный GTIN, исходный код и вариант без ведущего нуля (UPC-A)
+  const variants = [...new Set([norm, barcode, norm.replace(/^0+/, "")])].filter((c) => c.length >= 8);
+  for (const c of variants) {
+    const found = await fetchOne(c).catch(() => null);
+    if (found) return found;
+  }
+  return null;
 }
 
 export async function searchOnline(query: string, signal?: AbortSignal): Promise<Product[]> {
