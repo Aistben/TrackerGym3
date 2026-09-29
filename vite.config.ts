@@ -15,6 +15,9 @@ export default defineConfig({
     host: "0.0.0.0",
     port: 5173,
     allowedHosts: true,
+    strictPort: true,
+    cors: true,
+    hmr: { clientPort: 443, protocol: "wss" },
   },
   preview: {
     host: "0.0.0.0",
