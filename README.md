@@ -12,6 +12,21 @@
 - **Графики, которые растут вместе с записями.** Вес: факт против плановой траектории от стартового веса + линия цели и прогноз срока. Калории по дням с линией нормы. БЖУ по дням (stacked). Диапазоны 2 недели / месяц / 3 месяца.
 - **Данные локально** (localStorage), есть экспорт/импорт JSON.
 
+## Деплой на Vercel (рекомендуется)
+
+Репозиторий уже настроен: `vercel.json` (framework `vite`, build `npm run build`, output `dist`, SPA-rewrites, `Permissions-Policy: camera=(self)`).
+
+1. Открыть **https://vercel.com/new** и войти через GitHub
+2. **Import** репозитория `Aistben/TrackerGym3` (при первом разе — Add GitHub Account / Configure и дать доступ к репо)
+3. Настройки подставятся сами из `vercel.json` → **Deploy**
+4. Через ~1 минуту будет адрес вида `https://tracker-gym3.vercel.app`
+
+Какая ветка уходит в прод:
+- слить PR `arena/01a0ee50-trackergym3 → main` — прод собирается с `main`;
+- либо **Project → Settings → Git → Production Branch** поставить `arena/01a0ee50-trackergym3`.
+
+Каждый пуш в ветку = автоматический новый деплой, плюс preview-ссылка на каждый PR.
+
 ## Открыть с телефона (постоянная ссылка)
 
 В репозитории лежит готовая однофайловая сборка `docs/index.html`. Чтобы получить постоянный HTTPS-адрес:
