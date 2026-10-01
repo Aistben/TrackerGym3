@@ -877,19 +877,61 @@ function Wheel({
 function NewMealForm({ onCreate }: { onCreate: (title: string, time: string) => void }) {
   const [title, setTitle] = useState("");
   const [time, setTime] = useState(nowTime());
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [h, m] = time.split(":").map(Number);
+  const [hour, setHour] = useState(Number.isFinite(h) ? h : 12);
+  const [minute, setMinute] = useState(Number.isFinite(m) ? m : 0);
+  const hourRef = useRef<HTMLDivElement>(null);
+  const minuteRef = useRef<HTMLDivElement>(null);
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+  const minutes = Array.from({ length: 12 }, (_, i) => i * 5);
+
+  useEffect(() => {
+    setTime(`${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`);
+  }, [hour, minute]);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    hourRef.current?.children[hour]?.scrollIntoView({ block: "center", behavior: "instant" as ScrollBehavior });
+    minuteRef.current?.children[Math.round(minute / 5)]?.scrollIntoView({ block: "center", behavior: "instant" as ScrollBehavior });
+  }, [pickerOpen]);
+
   return (
     <div className="space-y-3">
-      <div className="rounded-xl bg-panel2/60 px-3 py-2 text-xs leading-relaxed text-mute">
-        Название необязательно. Если оставить поле пустым, карточка останется без названия. Время можно изменить позже.
-      </div>
       <Field label="Название (необязательно)">
         <input className="field" {...noSuggest} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Например, После тренировки" />
       </Field>
+
       <Field label="Время приёма">
-        <input type="time" className="field" value={time} onChange={(e) => setTime(e.target.value)} />
+        <button
+          type="button"
+          onClick={() => setPickerOpen((open) => !open)}
+          aria-expanded={pickerOpen}
+          className={`field flex w-full items-center justify-between gap-2 text-left transition ${
+            pickerOpen ? "border-acc2 ring-2 ring-acc2/25" : ""
+          }`}
+        >
+          <span className="font-mono text-lg font-semibold tracking-wide">{time}</span>
+          <span className="flex shrink-0 items-center gap-2 text-mute">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+              <circle cx="12" cy="12" r="8.5" />
+              <path d="M12 7.5V12l3 1.8" />
+            </svg>
+            <span className={`text-xs transition ${pickerOpen ? "rotate-180" : ""}`}>▾</span>
+          </span>
+        </button>
       </Field>
+
+      {pickerOpen && (
+        <div className="rise relative grid w-full grid-cols-2 gap-2 overflow-hidden rounded-2xl border border-line bg-panel2/60 p-1.5">
+          <div className="pointer-events-none absolute inset-x-2 top-1/2 z-10 h-10 -translate-y-1/2 rounded-xl border border-acc/40 bg-acc/15" />
+          <Wheel label="Часы" values={hours} value={hour} onChange={setHour} scrollRef={hourRef} />
+          <Wheel label="Минуты" values={minutes} value={minute} onChange={setMinute} scrollRef={minuteRef} />
+        </div>
+      )}
+
       <Btn className="w-full" disabled={!time} onClick={() => onCreate(title.trim(), time)}>
-        Добавить
+        Добавить приём на {time}
       </Btn>
     </div>
   );

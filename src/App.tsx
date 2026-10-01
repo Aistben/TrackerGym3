@@ -97,6 +97,7 @@ export default function App() {
         <ProfileView state={state} setState={setState} targets={targets} currentWeight={currentWeight} />
       )}
 
+      {tab === "day" && (
       <button
         type="button"
         aria-label="Добавить продукт по фото"
@@ -110,6 +111,7 @@ export default function App() {
       >
         📷
       </button>
+      )}
 
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[rgb(24_16_44/.92)] backdrop-blur-xl">
         <div className="mx-auto flex max-w-lg px-2 py-1.5">
