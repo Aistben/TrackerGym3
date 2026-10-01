@@ -7,6 +7,7 @@ export function Sheet({
   children,
   full,
   center = false,
+  compact = false,
   noBackdrop = false,
 }: {
   open: boolean;
@@ -15,6 +16,7 @@ export function Sheet({
   children: ReactNode;
   full?: boolean;
   center?: boolean;
+  compact?: boolean;
   noBackdrop?: boolean;
 }) {
   useEffect(() => {
@@ -33,8 +35,8 @@ export function Sheet({
     <div className={`fixed inset-0 z-50 flex justify-center ${center ? "items-center p-4" : "items-end sm:items-center"}`}>
       {!noBackdrop && <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />}
       <div
-        className={`sheet-in relative w-full max-w-lg overflow-hidden border border-line bg-panel shadow-2xl shadow-black/40 ${
-          center ? "max-h-[88vh] rounded-3xl" : "rounded-t-3xl sm:rounded-3xl"
+        className={`sheet-in relative w-full ${compact ? "max-w-sm" : "max-w-lg"} overflow-hidden border border-line bg-panel shadow-2xl shadow-black/40 ${
+          center ? `${compact ? "max-h-[72vh]" : "max-h-[88vh]"} rounded-3xl` : "rounded-t-3xl sm:rounded-3xl"
         } ${full ? "h-[92vh] sm:h-[80vh]" : "max-h-[90vh]"} flex flex-col`}
       >
         <div className={`${center ? "hidden" : "flex"} shrink-0 flex-col pt-2 sm:hidden`}>
@@ -50,7 +52,7 @@ export function Sheet({
           </button>
         </div>
         <div
-          className="flex-1 overflow-y-auto overscroll-contain p-4"
+          className={`flex-1 overflow-y-auto overscroll-contain ${compact ? "p-3" : "p-4"}`}
           style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
         >
           {children}

@@ -288,7 +288,7 @@ export default function AddFood({
             Назад
           </Btn>
           <Btn className="flex-[2]" disabled={g <= 0} onClick={confirmAdd}>
-            Добавить в «{mealTitle}»
+            {mealTitle ? `Добавить в «${mealTitle}»` : "Добавить"}
           </Btn>
         </div>
       </div>
@@ -345,14 +345,6 @@ export default function AddFood({
             </Field>
           ))}
         </div>
-        <Field label="Вес порции, г" hint="необязательно — 1 шт / 1 упаковка">
-          <input
-            className="field"
-            inputMode="decimal"
-            value={draft.portion}
-            onChange={(e) => setDraft({ ...draft, portion: e.target.value.replace(",", ".") })}
-          />
-        </Field>
         <div className="flex gap-2 pt-1">
           <Btn variant="soft" className="flex-1" onClick={() => setMode("search")}>
             Назад

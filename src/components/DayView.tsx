@@ -400,7 +400,7 @@ export default function DayView({
         </div>
       </Sheet>
 
-      <Sheet open={!!addTo} onClose={closeAddFood} title="Добавить продукт" full>
+      <Sheet open={!!addTo} onClose={closeAddFood} title="Добавить продукт">
         {addTo && (
           <AddFood
             key={addTo.id + addMode}
@@ -438,7 +438,7 @@ export default function DayView({
         />
       </Sheet>
 
-      <Sheet open={!!timePick} onClose={() => setTimePick(null)} title={timePick ? `Время · ${mealTitle(timePick.title)}` : "Время"} center>
+      <Sheet open={!!timePick} onClose={() => setTimePick(null)} title="Время" center>
         {timePick && (
           <TimePicker
             value={timePick.time}
@@ -460,6 +460,7 @@ export default function DayView({
         }}
         title={editEntry?.entry.name || "Продукт"}
         center
+        compact
         noBackdrop
       >
         {editEntry && (
@@ -501,7 +502,9 @@ export default function DayView({
         {deleteMeal && (
           <div className="space-y-4">
             <p className="text-sm leading-relaxed text-mute">
-              Удалить «{mealTitle(deleteMeal.title)}» вместе со всеми продуктами? Это действие нельзя отменить.
+              {mealTitle(deleteMeal.title)
+                ? `Удалить «${mealTitle(deleteMeal.title)}» вместе со всеми продуктами? Это действие нельзя отменить.`
+                : "Удалить этот приём вместе со всеми продуктами? Это действие нельзя отменить."}
             </p>
             <div className="grid grid-cols-2 gap-2">
               <Btn variant="soft" onClick={() => setDeleteMeal(null)}>
@@ -581,7 +584,9 @@ function EntryEditor({
     <div className="space-y-4">
       <div className="card p-4">
         <div className="font-semibold">{action.entry.name}</div>
-        <div className="mt-1 text-xs text-mute">{action.mealTitle} · на 100 г: {action.entry.kcal} ккал</div>
+        <div className="mt-1 text-xs text-mute">
+          {action.mealTitle && `${action.mealTitle} · `}на 100 г: {action.entry.kcal} ккал
+        </div>
       </div>
       <Field label="Количество, г / мл">
         <div className="flex items-center gap-2">
@@ -806,7 +811,7 @@ function TimePicker({
           className="field"
           value={mealName}
           onChange={(event) => setMealName(event.target.value)}
-          placeholder="Оставьте пустым — будет «—»"
+          placeholder="Оставьте пустым"
         />
       </Field>
       <div>
@@ -873,7 +878,7 @@ function NewMealForm({ onCreate }: { onCreate: (title: string, time: string) => 
   return (
     <div className="space-y-3">
       <div className="rounded-xl bg-panel2/60 px-3 py-2 text-xs leading-relaxed text-mute">
-        Название необязательно — если оставить поле пустым, в карточке будет стоять прочерк «—». Время можно изменить позже.
+        Название необязательно. Если оставить поле пустым, карточка останется без названия. Время можно изменить позже.
       </div>
       <Field label="Название (необязательно)">
         <input className="field" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Например, После тренировки" />
@@ -894,7 +899,7 @@ function isTargetValue(value: number, target: number) {
 
 function mealTitle(title?: string) {
   const value = title?.trim() ?? "";
-  return !value || value === "Приём" ? "—" : value;
+  return value === "Приём" ? "" : value;
 }
 
 function nowTime() {
