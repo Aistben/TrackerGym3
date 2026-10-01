@@ -2,6 +2,36 @@ import { useRef, useState } from "react";
 import { Btn } from "./ui";
 import { parseNutritionLabel, type LabelValues } from "../lib/nutritionLabel";
 
+/**
+ * Фото с телефона легко весит 10-12+ мегапикселей — Tesseract разбирает его
+ * целую вечность (и точность от лишних пикселей не растёт, только от шума и
+ * смаза). Уменьшаем длинную сторону до разумного предела и слегка повышаем
+ * контраст/ч-б — распознаётся заметно быстрее и как минимум не хуже.
+ */
+async function prepareForOcr(file: File, maxSide = 1600): Promise<HTMLCanvasElement> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = reject;
+      el.src = url;
+    });
+    const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.max(1, Math.round(img.naturalWidth * scale));
+    const h = Math.max(1, Math.round(img.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d")!;
+    ctx.filter = "grayscale(1) contrast(1.35)";
+    ctx.drawImage(img, 0, 0, w, h);
+    return canvas;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export default function LabelScanner({ onRead }: { onRead: (values: LabelValues) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -11,8 +41,10 @@ export default function LabelScanner({ onRead }: { onRead: (values: LabelValues)
   async function recognize(file: File) {
     setBusy(true);
     setProgress(0);
-    setMessage("Подготавливаем распознавание…");
+    setMessage("Уменьшаем фото…");
     try {
+      const image = await prepareForOcr(file);
+      setMessage("Подготавливаем распознавание…");
       const { createWorker } = await import("tesseract.js");
       const worker = await createWorker("rus+eng", 1, {
         logger: (event) => {
@@ -22,7 +54,7 @@ export default function LabelScanner({ onRead }: { onRead: (values: LabelValues)
           }
         },
       });
-      const result = await worker.recognize(file);
+      const result = await worker.recognize(image);
       await worker.terminate();
       const values = parseNutritionLabel(result.data.text);
       const count = Object.keys(values).length;
