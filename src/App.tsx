@@ -9,9 +9,9 @@ import ProfileView from "./components/ProfileView";
 type Tab = "day" | "progress" | "profile";
 
 const TABS: { key: Tab; icon: string; label: string }[] = [
-  { key: "day", icon: "🍽", label: "Дневник" },
-  { key: "progress", icon: "📈", label: "Прогресс" },
-  { key: "profile", icon: "⚙️", label: "Профиль" },
+  { key: "day", icon: "◒", label: "Дневник" },
+  { key: "progress", icon: "↗", label: "Прогресс" },
+  { key: "profile", icon: "◌", label: "Профиль" }
 ];
 
 export default function App() {
@@ -53,7 +53,7 @@ export default function App() {
             </div>
             <h1 className="mt-3 text-[clamp(1.55rem,7vw,2.15rem)] font-extrabold leading-none tracking-[-0.04em]">{TABS.find((t) => t.key === tab)!.label}</h1>
           </div>
-          <div className="mt-1 shrink-0 rounded-2xl bg-[#202522] px-3.5 py-2.5 text-right text-[#fff] shadow-lg shadow-black/10">
+          <div className="mt-1 shrink-0 rounded-2xl bg-[#251536] px-3.5 py-2.5 text-right text-[#fff] shadow-lg shadow-black/10">
             <div className="text-xl leading-tight font-extrabold text-[#ffb08e]">{targets.calories}</div>
             <div className="text-[10px] leading-tight text-white/70">ккал / день</div>
           </div>

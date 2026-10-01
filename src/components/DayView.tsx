@@ -212,7 +212,7 @@ export default function DayView({
 
       {!meals.length && <Empty icon="🍽" text="Добавь первый приём пищи на этот день" />}
 
-      <div className="rounded-3xl border border-acc/25 bg-gradient-to-br from-acc/12 via-panel to-panel p-4 shadow-lg shadow-black/10">
+      <div className="photo-hero rounded-3xl border border-acc/35 p-4 shadow-lg shadow-black/20">
         <div className="mb-1 text-[11px] font-bold tracking-[0.16em] text-acc uppercase">Главный инструмент</div>
         <div className="text-lg font-bold">Сними таблицу БЖУ</div>
         <p className="mt-1 max-w-[34rem] text-xs leading-relaxed text-mute">Фото пищевой ценности на 100 г — приложение распознает калории, белки, жиры и углеводы. Без штрихкода и долгого поиска.</p>
