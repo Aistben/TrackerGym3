@@ -9,9 +9,9 @@ import ProfileView from "./components/ProfileView";
 type Tab = "day" | "progress" | "profile";
 
 const TABS: { key: Tab; icon: string; label: string }[] = [
-  { key: "day", icon: "🍽", label: "Дневник" },
-  { key: "progress", icon: "📈", label: "Прогресс" },
-  { key: "profile", icon: "⚙️", label: "Профиль" },
+  { key: "day", icon: "◒", label: "Дневник" },
+  { key: "progress", icon: "↗", label: "Прогресс" },
+  { key: "profile", icon: "◌", label: "Профиль" }
 ];
 
 export default function App() {
@@ -44,18 +44,18 @@ export default function App() {
 
   return (
     <div className="mx-auto min-h-dvh max-w-lg px-4 pt-5">
-      <header className="sticky top-0 z-30 -mx-4 mb-4 bg-ink/80 px-4 pt-[env(safe-area-inset-top)] pb-3 backdrop-blur-md">
-        <div className="flex items-center justify-between gap-3">
+      <header className="sticky top-0 z-30 -mx-4 mb-5 border-b border-line/70 bg-ink/80 px-4 pt-[env(safe-area-inset-top)] pb-4 backdrop-blur-xl">
+        <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 text-[11px] font-medium tracking-[0.16em] text-mute uppercase">
-              <span>{goal.emoji}</span>
-              <span className="truncate">{goal.label}</span>
+            <div className="flex items-center gap-2 text-[10px] font-bold tracking-[0.18em] text-acc uppercase">
+              <span className="grid size-7 place-items-center rounded-xl bg-acc text-sm shadow-sm shadow-acc/20">{goal.emoji}</span>
+              <span>LUMEN HEALTH</span>
             </div>
-            <h1 className="truncate text-xl font-bold">{TABS.find((t) => t.key === tab)!.label}</h1>
+            <h1 className="mt-3 text-[clamp(1.55rem,7vw,2.15rem)] font-extrabold leading-none tracking-[-0.04em]">{TABS.find((t) => t.key === tab)!.label}</h1>
           </div>
-          <div className="shrink-0 rounded-2xl border border-line bg-panel2/70 px-3 py-1.5 text-right">
-            <div className="text-lg leading-tight font-bold text-acc">{targets.calories}</div>
-            <div className="text-[10px] leading-tight text-mute">ккал в день</div>
+          <div className="mt-1 shrink-0 rounded-2xl bg-[#251536] px-3.5 py-2.5 text-right text-[#fff] shadow-lg shadow-black/10">
+            <div className="text-xl leading-tight font-extrabold text-[#ffb08e]">{targets.calories}</div>
+            <div className="text-[10px] leading-tight text-white/70">ккал / день</div>
           </div>
         </div>
       </header>

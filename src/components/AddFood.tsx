@@ -8,7 +8,7 @@ import { Btn, Empty, Field, IconBtn, Tabs } from "./ui";
 import Scanner from "./Scanner";
 import LabelScanner from "./LabelScanner";
 
-type Mode = "search" | "scan" | "form" | "portion";
+type Mode = "search" | "scan" | "form" | "portion" | "photo";
 type Lib = "recent" | "base";
 
 const blankDraft = { name: "", brand: "", kcal: "", protein: "", fat: "", carbs: "", portion: "", barcode: "" };
@@ -27,7 +27,7 @@ export default function AddFood({
   products: Product[];
   recentProductIds: string[];
   mealTitle: string;
-  startMode?: "search" | "scan";
+  startMode?: "search" | "scan" | "photo";
   onSaveProduct: (p: Product) => void;
   onDeleteProduct: (id: string) => void;
   onUsed: (id: string) => void;
@@ -257,7 +257,7 @@ export default function AddFood({
   if (mode === "scan") return <Scanner onDetect={handleCode} onClose={() => setMode("search")} />;
 
   /* ---------- создание / редактирование продукта ---------- */
-  if (mode === "form") {
+  if (mode === "form" || mode === "photo") {
     return (
       <div className="space-y-3">
         {notice && <div className="rounded-xl border border-warn/30 bg-warn/10 p-3 text-xs text-warn">{notice}</div>}
@@ -321,16 +321,21 @@ export default function AddFood({
   /* ---------- поиск: недавние / вся база ---------- */
   return (
     <div className="space-y-3">
+      <div className="rounded-2xl border border-acc/25 bg-acc/8 p-3">
+        <div className="font-semibold">📸 Основной способ — фото БЖУ</div>
+        <div className="mt-1 text-xs leading-relaxed text-mute">Сфотографируй строку «на 100 г» — заполним карточку автоматически.</div>
+        <Btn className="mt-3 w-full" onClick={() => { setDraft({ ...blankDraft }); setMode("photo"); }}>Сфотографировать БЖУ</Btn>
+      </div>
       <div className="flex gap-2">
         <input
           ref={searchRef}
           className="field"
-          placeholder="Название, бренд или штрихкод…"
+          placeholder="Найти продукт по названию…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           autoFocus
         />
-        <IconBtn onClick={() => setMode("scan")} title="Сканировать штрихкод" size={44}>
+        <IconBtn onClick={() => setMode("scan")} title="Дополнительно: сканировать штрихкод" size={44}>
           <span className="text-lg">📷</span>
         </IconBtn>
       </div>

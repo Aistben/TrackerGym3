@@ -58,7 +58,7 @@ export default function ProfileView({
               }`}
             >
               <div className="text-lg">{GOALS[g].emoji}</div>
-              <span className="line-clamp-1">{GOALS[g].label}</span>
+              <span className="mt-1 block text-[11px] leading-tight">{GOALS[g].label}</span>
             </button>
           ))}
         </div>

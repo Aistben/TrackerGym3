@@ -1,18 +1,9 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { AppState, Meal, MealEntry, Product, Targets } from "../lib/types";
 import { dayTotals, entryTotals, humanDate, round, shiftDate, sumTotals, today } from "../lib/nutrition";
 import { uid } from "../lib/storage";
 import { Bar, Btn, Empty, Field, IconBtn, Ring, Sheet } from "./ui";
 import AddFood from "./AddFood";
-
-const PRESETS = [
-  { title: "Завтрак", time: "08:30" },
-  { title: "Перекус", time: "11:00" },
-  { title: "Обед", time: "13:30" },
-  { title: "Полдник", time: "16:30" },
-  { title: "Ужин", time: "19:00" },
-  { title: "Перед сном", time: "22:00" },
-];
 
 export default function DayView({
   state,
@@ -28,11 +19,13 @@ export default function DayView({
   setDate: (d: string) => void;
 }) {
   const [addTo, setAddTo] = useState<Meal | null>(null);
-  const [addMode, setAddMode] = useState<"search" | "scan">("search");
+  const [addMode, setAddMode] = useState<"search" | "scan" | "photo">("search");
+  const [photoFirst, setPhotoFirst] = useState(false);
   const [scanPick, setScanPick] = useState(false);
   const [newMeal, setNewMeal] = useState(false);
   const [moveMeal, setMoveMeal] = useState<Meal | null>(null);
   const [editMeal, setEditMeal] = useState<Meal | null>(null);
+  const [timePick, setTimePick] = useState<Meal | null>(null);
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   const meals = useMemo(
@@ -44,8 +37,23 @@ export default function DayView({
 
   const update = (fn: (ms: Meal[]) => Meal[]) => setState((s) => ({ ...s, meals: fn(s.meals) }));
 
-  function addMeal(title: string, time: string) {
-    update((ms) => [...ms, { id: uid(), date, title, time, entries: [] }]);
+  function addMeal(title: string, time: string): Meal {
+    const meal = { id: uid(), date, title, time, entries: [] };
+    update((ms) => [...ms, meal]);
+    return meal;
+  }
+
+  function openPhotoAdd() {
+    // Фото — быстрый сценарий: не заставляем пользователя сначала создавать
+    // отдельную карточку. Используем последний приём или создаём нейтральный.
+    const target = meals[meals.length - 1] ?? addMeal("Новый приём", currentTime());
+    setAddMode("photo");
+    setAddTo(target);
+  }
+
+  function currentTime() {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
   }
 
   function addEntry(mealId: string, e: MealEntry) {
@@ -144,9 +152,13 @@ export default function DayView({
         return (
           <div key={meal.id} className="card rise overflow-hidden">
             <div className="flex items-center gap-2.5 border-b border-line px-4 py-3">
-              <div className="shrink-0 rounded-lg bg-panel2 px-2 py-1 font-mono text-xs whitespace-nowrap text-acc2">
+              <button
+                onClick={() => setTimePick(meal)}
+                title="Выбрать время"
+                className="shrink-0 rounded-lg bg-acc/12 px-2.5 py-1.5 font-mono text-xs font-semibold whitespace-nowrap text-acc2 transition hover:bg-acc/20"
+              >
                 {meal.time}
-              </div>
+              </button>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold">{meal.title}</div>
                 <div className="truncate text-[11px] text-mute">
@@ -200,13 +212,15 @@ export default function DayView({
 
       {!meals.length && <Empty icon="🍽" text="Добавь первый приём пищи на этот день" />}
 
+      <div className="photo-hero rounded-3xl border border-acc/35 p-4 shadow-lg shadow-black/20">
+        <div className="mb-1 text-[11px] font-bold tracking-[0.16em] text-acc uppercase">Главный инструмент</div>
+        <div className="text-lg font-bold">Сними таблицу БЖУ</div>
+        <p className="mt-1 max-w-[34rem] text-xs leading-relaxed text-mute">Фото пищевой ценности на 100 г — приложение распознает калории, белки, жиры и углеводы. Без штрихкода и долгого поиска.</p>
+        <Btn className="mt-3 w-full" onClick={openPhotoAdd}>📸 Добавить продукт по фото</Btn>
+      </div>
       <div className="flex gap-2">
-        <Btn variant="soft" className="flex-1" onClick={() => setNewMeal(true)}>
-          + Новый приём пищи
-        </Btn>
-        <Btn variant="soft" className="shrink-0 !px-4" title="Сканировать штрихкод" onClick={() => setScanPick(true)}>
-          📷
-        </Btn>
+        <Btn variant="soft" className="flex-1" onClick={() => setNewMeal(true)}>+ Новый приём пищи</Btn>
+        <Btn variant="soft" className="shrink-0 !px-4" title="Дополнительные способы поиска" onClick={() => setScanPick(true)}>⋯</Btn>
       </div>
 
       <Sheet open={scanPick} onClose={() => setScanPick(false)} title="Сканировать штрихкод">
@@ -287,11 +301,16 @@ export default function DayView({
       </Sheet>
 
       {/* Новый приём пищи */}
-      <Sheet open={newMeal} onClose={() => setNewMeal(false)} title="Новый приём пищи">
+      <Sheet open={newMeal} onClose={() => { setNewMeal(false); setPhotoFirst(false); }} title="Новый приём пищи">
         <NewMealForm
           onCreate={(title, time) => {
-            addMeal(title, time);
+            const meal = addMeal(title, time);
             setNewMeal(false);
+            if (photoFirst) {
+              setPhotoFirst(false);
+              setAddMode("photo");
+              setAddTo(meal);
+            }
           }}
         />
       </Sheet>
@@ -314,6 +333,20 @@ export default function DayView({
               update((ms) => ms.filter((m) => m.id !== moveMeal.id));
               setMoveMeal(null);
             }}
+          />
+        )}
+      </Sheet>
+
+      {/* Быстрый выбор времени прямо из карточки */}
+      <Sheet open={!!timePick} onClose={() => setTimePick(null)} title={timePick ? `Время · ${timePick.title}` : "Время"}>
+        {timePick && (
+          <TimePicker
+            value={timePick.time}
+            onChange={(time) => {
+              update((ms) => ms.map((m) => (m.id === timePick.id ? { ...m, time } : m)));
+              setTimePick(null);
+            }}
+            onCustom={() => { setEditMeal(timePick); setTimePick(null); }}
           />
         )}
       </Sheet>
@@ -349,6 +382,88 @@ function MacroLine({ label, value, max, color }: { label: string; value: number;
   );
 }
 
+function TimePicker({
+  value,
+  onChange,
+  onCustom,
+}: {
+  value: string;
+  onChange: (time: string) => void;
+  onCustom: () => void;
+}) {
+  const [hour, minute] = value.split(":").map(Number);
+  const [selectedHour, setSelectedHour] = useState(hour || 12);
+  const [selectedMinute, setSelectedMinute] = useState(minute || 0);
+  const hourRef = useRef<HTMLDivElement>(null);
+  const minuteRef = useRef<HTMLDivElement>(null);
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+  const minutes = Array.from({ length: 12 }, (_, i) => i * 5);
+
+  useEffect(() => {
+    const scrollTo = (ref: React.RefObject<HTMLDivElement | null>, index: number) => {
+      ref.current?.children[index]?.scrollIntoView({ block: "center", behavior: "instant" as ScrollBehavior });
+    };
+    scrollTo(hourRef, selectedHour);
+    scrollTo(minuteRef, Math.round(selectedMinute / 5));
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-sm text-mute">Проведи пальцем по часам и минутам — обе колонки листаются одинаково. Выбранное значение будет в центре.</p>
+        <div className="relative mt-4 grid grid-cols-2 gap-3 overflow-hidden rounded-2xl border border-line bg-panel2/60 p-2">
+          <div className="pointer-events-none absolute inset-x-2 top-1/2 z-10 h-12 -translate-y-1/2 rounded-xl border border-acc/40 bg-acc/10" />
+          <Wheel label="Часы" values={hours} value={selectedHour} onChange={setSelectedHour} scrollRef={hourRef} />
+          <Wheel label="Минуты" values={minutes} value={selectedMinute} onChange={setSelectedMinute} scrollRef={minuteRef} />
+        </div>
+      </div>
+      <Btn className="w-full" onClick={() => onChange(`${String(selectedHour).padStart(2, "0")}:${String(selectedMinute).padStart(2, "0")}`)}>
+        Выбрать {String(selectedHour).padStart(2, "0")}:{String(selectedMinute).padStart(2, "0")}
+      </Btn>
+      <Btn variant="soft" className="w-full" onClick={onCustom}>Ввести точное время с клавиатуры</Btn>
+    </div>
+  );
+}
+
+function Wheel({
+  label,
+  values,
+  value,
+  onChange,
+  scrollRef,
+}: {
+  label: string;
+  values: number[];
+  value: number;
+  onChange: (value: number) => void;
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  return (
+    <div className="relative z-20 min-w-0">
+      <div className="mb-1 text-center text-[10px] font-bold tracking-[.14em] text-mute uppercase">{label}</div>
+      <div
+        ref={scrollRef}
+        onScroll={(event) => {
+          const box = event.currentTarget;
+          const index = Math.max(0, Math.min(values.length - 1, Math.round((box.scrollTop + box.clientHeight / 2 - 104) / 48)));
+          if (values[index] !== value) onChange(values[index]);
+        }}
+        className="h-52 touch-pan-y snap-y snap-mandatory select-none overflow-y-auto overscroll-contain py-20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {values.map((item) => (
+          <button
+            key={item}
+            onClick={() => onChange(item)}
+            className={`flex h-12 w-full snap-center items-center justify-center rounded-xl font-mono text-xl transition ${item === value ? "font-extrabold text-acc" : "text-mute/70"}`}
+          >
+            {String(item).padStart(2, "0")}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function NewMealForm({
   onCreate,
   initial,
@@ -362,26 +477,9 @@ function NewMealForm({
   const [time, setTime] = useState(initial?.time ?? "12:00");
   return (
     <div className="space-y-3">
-      {!initial && (
-        <div className="flex flex-wrap gap-2">
-          {PRESETS.map((p) => (
-            <button
-              key={p.title}
-              onClick={() => {
-                setTitle(p.title);
-                setTime(p.time);
-              }}
-              className={`rounded-lg border px-3 py-1.5 text-xs whitespace-nowrap transition ${
-                title === p.title ? "border-acc bg-acc/15 text-acc" : "border-line bg-panel2 hover:border-acc2/50"
-              }`}
-            >
-              {p.title}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="rounded-xl bg-panel2/60 px-3 py-2 text-xs leading-relaxed text-mute">Дай приёму своё название — например, «После тренировки» или «Поздний ужин». Время потом можно изменить нажатием на него в карточке.</div>
       <Field label="Название">
-        <input className="field" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Например, Обед" />
+        <input className="field" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Например, После тренировки" />
       </Field>
       <Field label="Время приёма">
         <input type="time" className="field" value={time} onChange={(e) => setTime(e.target.value)} />

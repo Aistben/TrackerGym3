@@ -1,153 +1,80 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink: #111827;
-  --color-panel: #1c2738;
-  --color-panel2: #263449;
-  --color-line: #3a4960;
-  --color-mute: #a9b8cd;
-  --color-acc: #6ee7a0;
-  --color-acc2: #67d4ff;
-  --color-warn: #fbbf24;
-  --color-bad: #f87171;
+  --color-ink: #0d0918;
+  --color-panel: #171126;
+  --color-panel2: #241a39;
+  --color-line: #403258;
+  --color-mute: #b1a7c5;
+  --color-acc: #c89bff;
+  --color-acc2: #7ce2d0;
+  --color-warn: #f5c06b;
+  --color-bad: #ff8297;
 }
 
-html,
-body,
-#root {
-  height: 100%;
-}
-
+html, body, #root { min-height: 100%; }
 body {
   margin: 0;
-  background:
-    radial-gradient(circle at 15% -10%, rgba(103, 212, 255, 0.13), transparent 32rem),
-    radial-gradient(circle at 100% 15%, rgba(110, 231, 160, 0.09), transparent 28rem),
-    var(--color-ink);
+  background: radial-gradient(circle at 15% -12%, #3b205c 0, transparent 33rem), radial-gradient(circle at 100% 18%, #182d43 0, transparent 28rem), var(--color-ink);
   background-attachment: fixed;
-  color: #f4f7fb;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #f8f4ff;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
 }
-
-* {
-  box-sizing: border-box;
-  min-width: 0;
-  -webkit-tap-highlight-color: transparent;
-}
-
-/* Длинные названия, штрихкоды и подписи не должны расширять экран. */
-p,
-span,
-div,
-button,
-label {
-  overflow-wrap: anywhere;
-}
-
-body {
-  overflow-x: hidden;
-}
-
-img,
-svg,
-video,
-canvas {
-  max-width: 100%;
-}
-
-@media (max-width: 359px) {
-  .field {
-    padding-inline: 0.6rem;
-  }
-}
-
-input,
-select,
-textarea,
-button {
-  font: inherit;
-  color: inherit;
-}
-
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-thumb {
-  background: #23304d;
-  border-radius: 99px;
-}
+* { box-sizing: border-box; min-width: 0; -webkit-tap-highlight-color: transparent; }
+body { overflow-x: hidden; }
+input, select, textarea, button { font: inherit; color: inherit; }
+button { cursor: pointer; }
+p, span, div, button, label { overflow-wrap: anywhere; }
+img, svg, video, canvas { max-width: 100%; }
+input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-thumb { background: #493966; border-radius: 99px; }
 
 @utility card {
-  background: linear-gradient(145deg, color-mix(in srgb, var(--color-panel) 96%, white), var(--color-panel));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--color-panel) 94%, white), var(--color-panel));
   border: 1px solid var(--color-line);
-  border-radius: 1.25rem;
-  box-shadow:
-    0 14px 32px rgb(0 0 0 / 0.16),
-    inset 0 1px 0 rgb(255 255 255 / 0.04);
+  border-radius: 1.35rem;
+  box-shadow: 0 14px 35px rgb(0 0 0 / .2), inset 0 1px 0 rgb(255 255 255 / .045);
 }
-
 @utility field {
-  width: 100%;
-  background: var(--color-panel2);
-  border: 1px solid var(--color-line);
-  border-radius: 0.85rem;
-  padding: 0.65rem 0.85rem;
-  outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  width: 100%; background: var(--color-panel2); border: 1px solid var(--color-line); border-radius: .9rem;
+  padding: .75rem .9rem; outline: none; transition: border-color .15s, box-shadow .15s, background .15s;
+}
+.field:focus { background: #2a1e42; border-color: var(--color-acc2); box-shadow: 0 0 0 3px rgb(124 226 208 / .15); }
+:focus-visible { outline: 2px solid rgb(124 226 208 / .7); outline-offset: 2px; }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+/* Героический блок фото БЖУ использует сгенерированную иллюстрацию. */
+.photo-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgb(30 17 54 / .96), rgb(80 45 113 / .9));
+}
+.photo-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(90deg, rgb(13 9 24 / .72), rgb(45 22 72 / .2)), url("./assets/lumen-purple-hero.jpg") center / cover;
+  opacity: .9;
+}
+.photo-hero::after {
+  content: "✦";
+  position: absolute;
+  top: 1rem;
+  right: 1.25rem;
+  color: rgb(255 255 255 / .7);
+  font-size: 1.3rem;
 }
 
-@utility field-focus {
-  border-color: var(--color-acc2);
-}
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.rise { animation: rise .22s ease-out both; }
+@keyframes sheet-in { from { transform: translateY(100%); } to { transform: none; } }
+.sheet-in { animation: sheet-in .25s cubic-bezier(.22,1,.36,1) both; }
 
-.field:focus {
-  border-color: var(--color-acc2);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-acc2) 22%, transparent);
-}
-
-:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--color-acc2) 70%, transparent);
-  outline-offset: 2px;
-}
-
-/* Safe-area отступы для полосы навигации и плавающих кнопок на iOS/Android. */
-.safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.rise {
-  animation: rise 0.22s ease-out both;
-}
-
-@keyframes sheet-in {
-  from {
-    transform: translateY(100%);
-  }
-  to {
-    transform: none;
-  }
-}
-
-.sheet-in {
-  animation: sheet-in 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+@media (min-width: 640px) {
+  body { background: radial-gradient(circle at 20% -10%, #3b205c 0, transparent 35rem), var(--color-ink); }
 }
