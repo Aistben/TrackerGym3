@@ -765,10 +765,18 @@ function CalendarView({
 }
 
 function CenterNotice({ message }: { message: string }) {
+  // Тост внизу экрана, в одну линию с круглой кнопкой камеры
   return (
-    <div className="pointer-events-none fixed inset-0 z-[70] grid place-items-center p-4">
-      <div className="rounded-2xl border border-acc2/40 bg-panel px-5 py-3 text-center text-sm font-semibold text-ink shadow-2xl shadow-black/15 backdrop-blur-xl">
-        ✓ {message}
+    <div
+      className="pointer-events-none fixed z-[70] flex justify-start"
+      style={{
+        left: "max(1rem, calc((100vw - 32rem) / 2 + 1rem))",
+        right: "max(5.25rem, calc((100vw - 32rem) / 2 + 5.25rem))",
+        bottom: "calc(5.75rem + env(safe-area-inset-bottom))",
+      }}
+    >
+      <div className="rise flex min-h-14 w-full items-center rounded-2xl border border-acc2/40 bg-panel px-4 py-2 text-left text-[13px] leading-snug font-semibold text-ink shadow-xl shadow-black/15 backdrop-blur-xl">
+        <span className="line-clamp-2">✓ {message}</span>
       </div>
     </div>
   );
