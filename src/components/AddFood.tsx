@@ -23,6 +23,8 @@ export default function AddFood({
   onAdd,
   onClose,
   onNotice,
+  onPortionPreview,
+  onModeChange,
 }: {
   products: Product[];
   recentProductIds: string[];
@@ -34,6 +36,9 @@ export default function AddFood({
   onAdd: (entry: MealEntry) => void;
   onClose: () => void;
   onNotice?: (message: string) => void;
+  /** живой предпросмотр порции — чтобы график сверху пересчитывался на лету */
+  onPortionPreview?: (preview: { product: Product; grams: number } | null) => void;
+  onModeChange?: (mode: "search" | "scan" | "form" | "portion" | "photo") => void;
 }) {
   const [mode, setMode] = useState<Mode>(startMode);
   const [lib, setLib] = useState<Lib>(recentProductIds.length ? "recent" : "base");
@@ -47,6 +52,20 @@ export default function AddFood({
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
   const [draft, setDraft] = useState({ ...blankDraft });
   const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    onModeChange?.(mode);
+  }, [mode, onModeChange]);
+
+  useEffect(() => {
+    if (mode !== "portion" || !picked) {
+      onPortionPreview?.(null);
+      return;
+    }
+    onPortionPreview?.({ product: picked, grams: Math.max(0, Number(grams) || 0) });
+  }, [mode, picked, grams, onPortionPreview]);
+
+  useEffect(() => () => onPortionPreview?.(null), [onPortionPreview]);
 
   const recent = useMemo(
     () => recentProductIds.map((id) => products.find((p) => p.id === id)).filter((p): p is Product => !!p),
