@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import type { ActivityKey, AppState, Goal, Profile, Sex, Targets } from "../lib/types";
 import { ACTIVITY, GOALS, macroCalories, round } from "../lib/nutrition";
 import { emptyState } from "../lib/storage";
-import { Btn, Field } from "./ui";
+import { Btn, Field, Sheet } from "./ui";
 
 export default function ProfileView({
   state,
@@ -17,6 +17,7 @@ export default function ProfileView({
 }) {
   const p = state.profile!;
   const [custom, setCustom] = useState(!!p.customMacros);
+  const [resetOpen, setResetOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const patch = (d: Partial<Profile>) => setState((s) => ({ ...s, profile: { ...s.profile!, ...d } }));
@@ -96,12 +97,15 @@ export default function ProfileView({
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Возраст">
-            <input className="field" inputMode="numeric" value={p.age} onChange={(e) => patch({ age: +e.target.value || 0 })} />
+            <input className="field" inputMode="numeric" type="number" min={13} max={100} value={p.age} onChange={(e) => patch({ age: +e.target.value || 0 })} />
           </Field>
           <Field label="Рост, см">
             <input
               className="field"
               inputMode="numeric"
+              type="number"
+              min={100}
+              max={250}
               value={p.height}
               onChange={(e) => patch({ height: +e.target.value || 0 })}
             />
@@ -110,6 +114,10 @@ export default function ProfileView({
             <input
               className="field"
               inputMode="decimal"
+              type="number"
+              min={20}
+              max={400}
+              step="0.1"
               value={p.startWeight}
               onChange={(e) => patch({ startWeight: +e.target.value.replace(",", ".") || 0 })}
             />
@@ -118,6 +126,10 @@ export default function ProfileView({
             <input
               className="field"
               inputMode="decimal"
+              type="number"
+              min={20}
+              max={400}
+              step="0.1"
               value={p.targetWeight}
               onChange={(e) => patch({ targetWeight: +e.target.value.replace(",", ".") || 0 })}
             />
@@ -180,7 +192,7 @@ export default function ProfileView({
                     className="field"
                     inputMode="numeric"
                     value={macros[key]}
-                    onChange={(e) => patch({ customMacros: { ...macros, [key]: +e.target.value || 0 } })}
+                    onChange={(e) => patch({ customMacros: { ...macros, [key]: +e.target.value.replace(",", ".") || 0 } })}
                   />
                 </Field>
               ))}
@@ -200,10 +212,10 @@ export default function ProfileView({
         <h3 className="text-sm font-semibold">Данные</h3>
         <div className="grid grid-cols-2 gap-2">
           <Btn variant="soft" onClick={exportData}>
-            ⬇️ Экспорт JSON
+            ⬇️ Сохранить данные
           </Btn>
           <Btn variant="soft" onClick={() => fileRef.current?.click()}>
-            ⬆️ Импорт
+            ⬆️ Загрузить данные
           </Btn>
         </div>
         <input
@@ -213,14 +225,32 @@ export default function ProfileView({
           hidden
           onChange={(e) => e.target.files?.[0] && importData(e.target.files[0])}
         />
-        <Btn
-          variant="danger"
-          className="w-full"
-          onClick={() => confirm("Удалить все данные и начать заново?") && setState(emptyState)}
-        >
+        <Btn variant="danger" className="w-full" onClick={() => setResetOpen(true)}>
           Сбросить всё
         </Btn>
       </div>
+
+      <Sheet open={resetOpen} onClose={() => setResetOpen(false)} title="Сбросить все данные?" center>
+        <div className="space-y-4">
+          <p className="text-sm leading-relaxed text-mute">
+            Профиль, дневник, продукты и история веса будут удалены. Это действие нельзя отменить.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <Btn variant="soft" onClick={() => setResetOpen(false)}>
+              Нет
+            </Btn>
+            <Btn
+              variant="danger"
+              onClick={() => {
+                setState(emptyState);
+                setResetOpen(false);
+              }}
+            >
+              Да, сбросить
+            </Btn>
+          </div>
+        </div>
+      </Sheet>
     </div>
   );
 }

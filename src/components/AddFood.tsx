@@ -4,7 +4,7 @@ import { round } from "../lib/nutrition";
 import { uid } from "../lib/storage";
 import { lookupBarcode, searchOnline } from "../lib/openfoodfacts";
 import { sameBarcode } from "../lib/barcode";
-import { Btn, Empty, Field, IconBtn, Tabs } from "./ui";
+import { Btn, Empty, Field, IconBtn, Sheet, Tabs } from "./ui";
 import Scanner from "./Scanner";
 import LabelScanner from "./LabelScanner";
 
@@ -23,6 +23,7 @@ export default function AddFood({
   onUsed,
   onAdd,
   onClose,
+  onNotice,
 }: {
   products: Product[];
   recentProductIds: string[];
@@ -33,6 +34,7 @@ export default function AddFood({
   onUsed: (id: string) => void;
   onAdd: (entry: MealEntry) => void;
   onClose: () => void;
+  onNotice?: (message: string) => void;
 }) {
   const [mode, setMode] = useState<Mode>(startMode);
   const [lib, setLib] = useState<Lib>(recentProductIds.length ? "recent" : "base");
@@ -43,6 +45,7 @@ export default function AddFood({
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState<Product | null>(null);
+  const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
   const [draft, setDraft] = useState({ ...blankDraft });
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -66,25 +69,33 @@ export default function AddFood({
   const abort = useRef<AbortController | null>(null);
   useEffect(() => {
     const s = q.trim();
+    abort.current?.abort();
     if (s.length < 3 || mode !== "search" || lib !== "base") {
       setOnline([]);
+      setLoading(false);
       return;
     }
+    let activeRequest: AbortController | null = null;
     const t = setTimeout(async () => {
-      abort.current?.abort();
       const ac = new AbortController();
+      activeRequest = ac;
       abort.current = ac;
       setLoading(true);
       try {
         const res = await searchOnline(s, ac.signal);
-        setOnline(res.filter((p) => !products.some((lp) => sameBarcode(lp.barcode, p.barcode))));
+        if (!ac.signal.aborted) {
+          setOnline(res.filter((p) => !products.some((lp) => sameBarcode(lp.barcode, p.barcode))));
+        }
       } catch {
-        /* offline — ничего страшного */
+        /* offline or cancelled — ничего страшного */
       } finally {
-        setLoading(false);
+        if (activeRequest === ac) setLoading(false);
       }
     }, 550);
-    return () => clearTimeout(t);
+    return () => {
+      window.clearTimeout(t);
+      activeRequest?.abort();
+    };
   }, [q, mode, lib, products]);
 
   function pick(p: Product, persist = false) {
@@ -143,6 +154,36 @@ export default function AddFood({
     setMode("form");
   }
 
+  async function lookupDraftProduct() {
+    const code = draft.barcode.replace(/\D/g, "");
+    if (code.length < 8) return;
+    setLoading(true);
+    setNotice("Ищем продукт по штрихкоду…");
+    try {
+      const found = await lookupBarcode(code);
+      if (!found) {
+        setNotice("Продукт не найден. Заполни название и БЖУ вручную.");
+        return;
+      }
+      setDraft((current) => ({
+        ...current,
+        name: found.name,
+        brand: found.brand ?? "",
+        barcode: found.barcode ?? code,
+        kcal: String(found.kcal),
+        protein: String(found.protein),
+        fat: String(found.fat),
+        carbs: String(found.carbs),
+        portion: found.portion ? String(found.portion) : current.portion,
+      }));
+      setNotice("Название, бренд, штрихкод и БЖУ заполнены — проверь данные перед сохранением.");
+    } catch {
+      setNotice("Не удалось получить данные по штрихкоду. Заполни карточку вручную.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function saveDraft() {
     const p: Product = {
       id: editing?.id ?? uid(),
@@ -180,6 +221,7 @@ export default function AddFood({
       fat: picked.fat,
       carbs: picked.carbs,
     });
+    onNotice?.(`${picked.name} добавлен в дневник`);
     onClose();
   }
 
@@ -246,7 +288,7 @@ export default function AddFood({
             Назад
           </Btn>
           <Btn className="flex-[2]" disabled={g <= 0} onClick={confirmAdd}>
-            Добавить в «{mealTitle}»
+            {mealTitle ? `Добавить в «${mealTitle}»` : "Добавить"}
           </Btn>
         </div>
       </div>
@@ -277,6 +319,11 @@ export default function AddFood({
             />
           </Field>
         </div>
+        {draft.barcode.replace(/\D/g, "").length >= 8 && (
+          <Btn variant="soft" size="sm" className="w-full" disabled={loading} onClick={lookupDraftProduct}>
+            {loading ? "Ищем…" : "Заполнить карточку по штрихкоду"}
+          </Btn>
+        )}
         <LabelScanner onRead={(values) => setDraft((current) => ({ ...current, ...values }))} />
         <div className="text-xs text-mute">Пищевая ценность на 100 г / 100 мл</div>
         <div className="grid grid-cols-2 gap-3">
@@ -298,14 +345,6 @@ export default function AddFood({
             </Field>
           ))}
         </div>
-        <Field label="Вес порции, г" hint="необязательно — 1 шт / 1 упаковка">
-          <input
-            className="field"
-            inputMode="decimal"
-            value={draft.portion}
-            onChange={(e) => setDraft({ ...draft, portion: e.target.value.replace(",", ".") })}
-          />
-        </Field>
         <div className="flex gap-2 pt-1">
           <Btn variant="soft" className="flex-1" onClick={() => setMode("search")}>
             Назад
@@ -321,11 +360,6 @@ export default function AddFood({
   /* ---------- поиск: недавние / вся база ---------- */
   return (
     <div className="space-y-3">
-      <div className="rounded-2xl border border-acc/25 bg-acc/8 p-3">
-        <div className="font-semibold">📸 Основной способ — фото БЖУ</div>
-        <div className="mt-1 text-xs leading-relaxed text-mute">Сфотографируй строку «на 100 г» — заполним карточку автоматически.</div>
-        <Btn className="mt-3 w-full" onClick={() => { setDraft({ ...blankDraft }); setMode("photo"); }}>Сфотографировать БЖУ</Btn>
-      </div>
       <div className="flex gap-2">
         <input
           ref={searchRef}
@@ -360,7 +394,7 @@ export default function AddFood({
 
       <div className="space-y-1.5">
         {list.map((p) => (
-          <Row key={p.id} p={p} onClick={() => pick(p)} onEdit={() => openEdit(p)} onDelete={() => onDeleteProduct(p.id)} />
+          <Row key={p.id} p={p} onClick={() => pick(p)} onEdit={() => openEdit(p)} onDelete={() => setDeleteProduct(p)} />
         ))}
         {!list.length && lib === "recent" && !loading && (
           <Empty icon="🕘" text="Пока нет недавних продуктов — добавь что-нибудь из базы" />
@@ -375,6 +409,29 @@ export default function AddFood({
         {lib === "base" &&
           online.map((p) => <Row key={p.id} p={p} online onClick={() => pick(p, true)} />)}
       </div>
+
+      <Sheet open={!!deleteProduct} onClose={() => setDeleteProduct(null)} title="Удалить продукт?" center>
+        {deleteProduct && (
+          <div className="space-y-4">
+            <p className="text-sm leading-relaxed text-mute">
+              Удалить «{deleteProduct.name}» из твоей базы? Уже добавленные записи в дневнике останутся.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Btn variant="soft" onClick={() => setDeleteProduct(null)}>Нет</Btn>
+              <Btn
+                variant="danger"
+                onClick={() => {
+                  onDeleteProduct(deleteProduct.id);
+                  setDeleteProduct(null);
+                  setNotice("Продукт удалён");
+                }}
+              >
+                Да, удалить
+              </Btn>
+            </div>
+          </div>
+        )}
+      </Sheet>
     </div>
   );
 }

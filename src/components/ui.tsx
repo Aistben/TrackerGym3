@@ -6,12 +6,20 @@ export function Sheet({
   title,
   children,
   full,
+  center = false,
+  compact = false,
+  noBackdrop = false,
+  placement = center ? "center" : "bottom",
 }: {
   open: boolean;
   onClose: () => void;
   title: ReactNode;
   children: ReactNode;
   full?: boolean;
+  center?: boolean;
+  compact?: boolean;
+  noBackdrop?: boolean;
+  placement?: "center" | "bottom";
 }) {
   useEffect(() => {
     if (!open) return;
@@ -26,27 +34,31 @@ export function Sheet({
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+    <div className={`fixed inset-0 z-50 flex justify-center ${placement === "center" ? "items-center p-4" : "items-end p-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))]"}`}>
+      {!noBackdrop && <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />}
       <div
-        className={`sheet-in relative w-full max-w-lg overflow-hidden rounded-t-3xl border border-line bg-panel shadow-2xl shadow-black/40 sm:rounded-3xl ${
-          full ? "h-[92vh] sm:h-[80vh]" : "max-h-[90vh]"
-        } flex flex-col`}
+        className={`sheet-in relative w-full ${compact ? "max-w-sm" : "max-w-lg"} overflow-hidden border border-line bg-panel shadow-2xl shadow-black/40 ${
+          placement === "center"
+            ? `${compact ? "max-h-[72vh]" : "max-h-[88vh]"} rounded-3xl`
+            : compact
+              ? "max-h-[58vh] rounded-3xl"
+              : "rounded-3xl sm:rounded-3xl"
+        } ${full ? "h-[92vh] sm:h-[80vh]" : "max-h-[90vh]"} flex flex-col`}
       >
-        <div className="flex shrink-0 flex-col pt-2 sm:hidden">
+        <div className={`${placement === "center" ? "hidden" : "flex"} shrink-0 flex-col pt-2 sm:hidden`}>
           <div className="mx-auto h-1.5 w-10 rounded-full bg-line" />
         </div>
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-3">
           <h3 className="min-w-0 flex-1 truncate text-base font-semibold leading-snug">{title}</h3>
           <button
             onClick={onClose}
-            className="grid size-8 shrink-0 place-items-center rounded-full bg-panel2 text-mute transition hover:text-white active:scale-90"
+            className="grid size-8 shrink-0 place-items-center rounded-full bg-panel2 text-mute transition hover:text-ink active:scale-90"
           >
             ✕
           </button>
         </div>
         <div
-          className="flex-1 overflow-y-auto overscroll-contain p-4"
+          className={`flex-1 overflow-y-auto overscroll-contain ${compact ? "p-3" : "p-4"}`}
           style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
         >
           {children}
@@ -95,8 +107,8 @@ export function Btn({
 }) {
   const styles = {
     primary: "bg-acc text-ink shadow-sm shadow-acc/30 hover:brightness-110",
-    soft: "bg-panel2 text-white border border-line hover:border-acc2/60 hover:bg-panel2/70",
-    ghost: "text-mute hover:text-white hover:bg-white/5",
+    soft: "bg-panel2 text-ink border border-line hover:border-acc2/60 hover:bg-panel2/70",
+    ghost: "text-mute hover:text-ink hover:bg-black/5",
     danger: "bg-bad/15 text-bad border border-bad/30 hover:bg-bad/25",
   }[variant];
   const sizing = size === "sm" ? "px-3 py-1.5 text-xs" : "px-4 py-2.5 text-sm";
@@ -135,7 +147,7 @@ export function IconBtn({
       title={title}
       style={{ width: size, height: size }}
       className={`grid shrink-0 place-items-center rounded-full border text-lg transition active:scale-90 ${
-        active ? "border-acc/50 bg-acc/15 text-acc" : "border-line bg-panel2 text-mute hover:text-white"
+        active ? "border-acc/50 bg-acc/15 text-acc" : "border-line bg-panel2 text-mute hover:text-ink"
       } ${className}`}
     >
       {children}
@@ -165,7 +177,7 @@ export function Tabs<T extends string | number>({
           onClick={() => onChange(it.key)}
           className={`truncate rounded-lg px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
             fill ? "flex-1" : ""
-          } ${value === it.key ? "bg-acc text-ink shadow-sm" : "text-mute hover:text-white"}`}
+          } ${value === it.key ? "bg-acc text-ink shadow-sm" : "text-mute hover:text-ink"}`}
         >
           {it.label}
         </button>

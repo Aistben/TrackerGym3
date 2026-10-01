@@ -46,23 +46,27 @@ export default function LabelScanner({ onRead }: { onRead: (values: LabelValues)
       const image = await prepareForOcr(file);
       setMessage("Подготавливаем распознавание…");
       const { createWorker } = await import("tesseract.js");
-      const worker = await createWorker("rus+eng", 1, {
-        logger: (event) => {
-          if (event.status === "recognizing text") {
-            setProgress(Math.round((event.progress || 0) * 100));
-            setMessage("Читаем таблицу на упаковке…");
-          }
-        },
-      });
-      const result = await worker.recognize(image);
-      await worker.terminate();
-      const values = parseNutritionLabel(result.data.text);
-      const count = Object.keys(values).length;
-      if (!count) {
-        setMessage("Не удалось разобрать БЖУ. Сними таблицу ровно, крупно и без бликов.");
-      } else {
-        onRead(values);
-        setMessage(`Распознано полей: ${count}. Обязательно проверь цифры перед сохранением.`);
+      let worker: Awaited<ReturnType<typeof createWorker>> | null = null;
+      try {
+        worker = await createWorker("rus+eng", 1, {
+          logger: (event) => {
+            if (event.status === "recognizing text") {
+              setProgress(Math.round((event.progress || 0) * 100));
+              setMessage("Читаем таблицу на упаковке…");
+            }
+          },
+        });
+        const result = await worker.recognize(image);
+        const values = parseNutritionLabel(result.data.text);
+        const count = Object.keys(values).length;
+        if (!count) {
+          setMessage("Не удалось разобрать БЖУ. Сними таблицу ровно, крупно и без бликов.");
+        } else {
+          onRead(values);
+          setMessage(`Распознано полей: ${count}. Обязательно проверь цифры перед сохранением.`);
+        }
+      } finally {
+        await worker?.terminate().catch(() => undefined);
       }
     } catch {
       setMessage("Распознавание не загрузилось. Проверь интернет и попробуй ещё раз.");
