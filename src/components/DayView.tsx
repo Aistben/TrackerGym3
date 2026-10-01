@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { AppState, Meal, MealEntry, Product, Targets } from "../lib/types";
 import { dayTotals, entryTotals, humanDate, round, shiftDate, sumTotals, today } from "../lib/nutrition";
 import { uid } from "../lib/storage";
@@ -340,26 +340,14 @@ export default function DayView({
       {/* Быстрый выбор времени прямо из карточки */}
       <Sheet open={!!timePick} onClose={() => setTimePick(null)} title={timePick ? `Время · ${timePick.title}` : "Время"}>
         {timePick && (
-          <div className="space-y-3">
-            <p className="text-sm text-mute">Выбери подходящее время — карточка сразу переместится в дневнике.</p>
-            <div className="grid grid-cols-3 gap-2">
-              {["06:00", "08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00", "22:00"].map((time) => (
-                <button
-                  key={time}
-                  onClick={() => {
-                    update((ms) => ms.map((m) => (m.id === timePick.id ? { ...m, time } : m)));
-                    setTimePick(null);
-                  }}
-                  className={`rounded-xl border px-3 py-3 font-mono text-sm font-semibold transition ${timePick.time === time ? "border-acc bg-acc/12 text-acc" : "border-line bg-panel2 hover:border-acc2/60"}`}
-                >
-                  {time}
-                </button>
-              ))}
-            </div>
-            <Btn variant="soft" className="w-full" onClick={() => { setEditMeal(timePick); setTimePick(null); }}>
-              Другое время…
-            </Btn>
-          </div>
+          <TimePicker
+            value={timePick.time}
+            onChange={(time) => {
+              update((ms) => ms.map((m) => (m.id === timePick.id ? { ...m, time } : m)));
+              setTimePick(null);
+            }}
+            onCustom={() => { setEditMeal(timePick); setTimePick(null); }}
+          />
         )}
       </Sheet>
 
@@ -390,6 +378,88 @@ function MacroLine({ label, value, max, color }: { label: string; value: number;
         </span>
       </div>
       <Bar value={value} max={max} color={color} />
+    </div>
+  );
+}
+
+function TimePicker({
+  value,
+  onChange,
+  onCustom,
+}: {
+  value: string;
+  onChange: (time: string) => void;
+  onCustom: () => void;
+}) {
+  const [hour, minute] = value.split(":").map(Number);
+  const [selectedHour, setSelectedHour] = useState(hour || 12);
+  const [selectedMinute, setSelectedMinute] = useState(minute || 0);
+  const hourRef = useRef<HTMLDivElement>(null);
+  const minuteRef = useRef<HTMLDivElement>(null);
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+  const minutes = Array.from({ length: 12 }, (_, i) => i * 5);
+
+  useEffect(() => {
+    const scrollTo = (ref: React.RefObject<HTMLDivElement | null>, index: number) => {
+      ref.current?.children[index]?.scrollIntoView({ block: "center", behavior: "instant" as ScrollBehavior });
+    };
+    scrollTo(hourRef, selectedHour);
+    scrollTo(minuteRef, Math.round(selectedMinute / 5));
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-sm text-mute">Проведи пальцем по часам или минутам. Выбранное значение будет в центре.</p>
+        <div className="relative mt-4 grid grid-cols-2 gap-3 overflow-hidden rounded-2xl border border-line bg-panel2/60 p-2">
+          <div className="pointer-events-none absolute inset-x-2 top-1/2 z-10 h-12 -translate-y-1/2 rounded-xl border border-acc/40 bg-acc/10" />
+          <Wheel label="Часы" values={hours} value={selectedHour} onChange={setSelectedHour} scrollRef={hourRef} />
+          <Wheel label="Минуты" values={minutes} value={selectedMinute} onChange={setSelectedMinute} scrollRef={minuteRef} />
+        </div>
+      </div>
+      <Btn className="w-full" onClick={() => onChange(`${String(selectedHour).padStart(2, "0")}:${String(selectedMinute).padStart(2, "0")}`)}>
+        Выбрать {String(selectedHour).padStart(2, "0")}:{String(selectedMinute).padStart(2, "0")}
+      </Btn>
+      <Btn variant="soft" className="w-full" onClick={onCustom}>Ввести точное время с клавиатуры</Btn>
+    </div>
+  );
+}
+
+function Wheel({
+  label,
+  values,
+  value,
+  onChange,
+  scrollRef,
+}: {
+  label: string;
+  values: number[];
+  value: number;
+  onChange: (value: number) => void;
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  return (
+    <div className="relative z-20 min-w-0">
+      <div className="mb-1 text-center text-[10px] font-bold tracking-[.14em] text-mute uppercase">{label}</div>
+      <div
+        ref={scrollRef}
+        onScroll={(event) => {
+          const box = event.currentTarget;
+          const index = Math.max(0, Math.min(values.length - 1, Math.round((box.scrollTop + box.clientHeight / 2 - 104) / 48)));
+          if (values[index] !== value) onChange(values[index]);
+        }}
+        className="h-52 snap-y snap-mandatory overflow-y-auto overscroll-contain py-20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {values.map((item) => (
+          <button
+            key={item}
+            onClick={() => onChange(item)}
+            className={`flex h-12 w-full snap-center items-center justify-center rounded-xl font-mono text-xl transition ${item === value ? "font-extrabold text-acc" : "text-mute/70"}`}
+          >
+            {String(item).padStart(2, "0")}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
