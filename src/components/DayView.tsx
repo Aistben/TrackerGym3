@@ -459,7 +459,7 @@ export default function DayView({
           setEditEntry(null);
         }}
         title={editEntry?.entry.name || "Продукт"}
-        center
+        placement="bottom"
         compact
         noBackdrop
       >

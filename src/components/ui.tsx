@@ -9,6 +9,7 @@ export function Sheet({
   center = false,
   compact = false,
   noBackdrop = false,
+  placement = center ? "center" : "bottom",
 }: {
   open: boolean;
   onClose: () => void;
@@ -18,6 +19,7 @@ export function Sheet({
   center?: boolean;
   compact?: boolean;
   noBackdrop?: boolean;
+  placement?: "center" | "bottom";
 }) {
   useEffect(() => {
     if (!open) return;
@@ -32,14 +34,18 @@ export function Sheet({
 
   if (!open) return null;
   return (
-    <div className={`fixed inset-0 z-50 flex justify-center ${center ? "items-center p-4" : "items-end sm:items-center"}`}>
+    <div className={`fixed inset-0 z-50 flex justify-center ${placement === "center" ? "items-center p-4" : "items-end p-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))]"}`}>
       {!noBackdrop && <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />}
       <div
         className={`sheet-in relative w-full ${compact ? "max-w-sm" : "max-w-lg"} overflow-hidden border border-line bg-panel shadow-2xl shadow-black/40 ${
-          center ? `${compact ? "max-h-[72vh]" : "max-h-[88vh]"} rounded-3xl` : "rounded-t-3xl sm:rounded-3xl"
+          placement === "center"
+            ? `${compact ? "max-h-[72vh]" : "max-h-[88vh]"} rounded-3xl`
+            : compact
+              ? "max-h-[58vh] rounded-3xl"
+              : "rounded-3xl sm:rounded-3xl"
         } ${full ? "h-[92vh] sm:h-[80vh]" : "max-h-[90vh]"} flex flex-col`}
       >
-        <div className={`${center ? "hidden" : "flex"} shrink-0 flex-col pt-2 sm:hidden`}>
+        <div className={`${placement === "center" ? "hidden" : "flex"} shrink-0 flex-col pt-2 sm:hidden`}>
           <div className="mx-auto h-1.5 w-10 rounded-full bg-line" />
         </div>
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-3">
