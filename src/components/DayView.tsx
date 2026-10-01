@@ -320,12 +320,12 @@ export default function DayView({
         const t = sumTotals(meal.entries);
         return (
           <div key={meal.id} className="card rise overflow-hidden">
-            <div className="flex items-center gap-2 border-b border-line px-3 py-3">
+            <div className="flex items-center gap-1.5 border-b border-line px-3 py-2.5">
               <button
                 type="button"
                 onClick={() => setTimePick(meal)}
                 title="Выбрать время"
-                className="shrink-0 rounded-lg bg-acc/12 px-2.5 py-1.5 font-mono text-xs font-semibold whitespace-nowrap text-acc2 transition hover:bg-acc/20"
+                className="shrink-0 rounded-lg bg-acc/12 px-2 py-1.5 font-mono text-xs font-semibold whitespace-nowrap text-acc2 transition hover:bg-acc/20"
               >
                 {meal.time}
               </button>
@@ -333,26 +333,27 @@ export default function DayView({
                 {meal.title?.trim() && meal.title.trim() !== "Приём" && (
                   <div className="truncate text-sm font-semibold">{meal.title.trim()}</div>
                 )}
-                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] font-semibold">
+                {/* КБЖУ приёма — всегда одной строкой, без переносов */}
+                <div className="text-[11px] font-semibold whitespace-nowrap">
                   <span className="text-ink">{round(t.kcal)} ккал</span>
-                  <span className="text-acc2">Б {round(t.protein)}</span>
-                  <span className="text-warn">Ж {round(t.fat)}</span>
-                  <span className="text-acc">У {round(t.carbs)}</span>
+                  <span className="text-acc2"> · Б {round(t.protein)}</span>
+                  <span className="text-warn"> · Ж {round(t.fat)}</span>
+                  <span className="text-acc"> · У {round(t.carbs)}</span>
                 </div>
               </div>
-              <IconBtn onClick={() => copyMeal(meal, shiftDate(date, 1))} title="Копия на завтра" size={32}>
-                <span className="text-lg leading-none">→</span>
+              <IconBtn onClick={() => copyMeal(meal, shiftDate(date, 1))} title="Копия на завтра" size={28}>
+                <span className="block -translate-y-px text-[13px] leading-none">→</span>
               </IconBtn>
-              <IconBtn onClick={() => copyMeal(meal, date)} title="Дублировать приём" size={32}>
-                <span className="text-lg leading-none">↗</span>
+              <IconBtn onClick={() => copyMeal(meal, date)} title="Дублировать приём" size={28}>
+                <span className="block -translate-y-px text-[13px] leading-none">↗</span>
               </IconBtn>
               <IconBtn
                 onClick={() => setDeleteMeal(meal)}
                 title="Удалить приём"
-                size={32}
+                size={28}
                 className="border-bad/40 text-bad hover:text-bad"
               >
-                <span className="text-sm">×</span>
+                <span className="block -translate-y-px text-[13px] leading-none">×</span>
               </IconBtn>
             </div>
 
@@ -374,15 +375,17 @@ export default function DayView({
                       style={{ touchAction: "manipulation" }}
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm">{entry.name}</div>
-                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px]">
+                        {/* Полное название — без обрезки */}
+                        <div className="text-sm leading-snug break-words">{entry.name}</div>
+                        {/* граммы и БЖУ — одной строкой */}
+                        <div className="mt-0.5 text-[11px] whitespace-nowrap">
                           <span className="text-mute">{round(entry.grams)} г</span>
-                          <span className="font-semibold text-acc2">Б {round(totalsForEntry.protein, 1)}</span>
-                          <span className="font-semibold text-warn">Ж {round(totalsForEntry.fat, 1)}</span>
-                          <span className="font-semibold text-acc">У {round(totalsForEntry.carbs, 1)}</span>
+                          <span className="font-semibold text-acc2"> · Б {round(totalsForEntry.protein, 1)}</span>
+                          <span className="font-semibold text-warn"> · Ж {round(totalsForEntry.fat, 1)}</span>
+                          <span className="font-semibold text-acc"> · У {round(totalsForEntry.carbs, 1)}</span>
                         </div>
                       </div>
-                      <div className="shrink-0 text-sm font-medium">{round(totalsForEntry.kcal)}</div>
+                      <div className="shrink-0 text-xs font-semibold whitespace-nowrap">{round(totalsForEntry.kcal)}</div>
                     </button>
                     <button
                       type="button"
@@ -457,11 +460,22 @@ export default function DayView({
       <Sheet
         open={!!addTo}
         onClose={closeAddFood}
-        title={addStep === "portion" ? "Количество" : "Добавить продукт"}
+        title={
+          addStep === "portion"
+            ? "Количество"
+            : addStep === "scan"
+              ? "Сканер штрихкода"
+              : addStep === "form"
+                ? "Карточка продукта"
+                : addStep === "photo"
+                  ? "Продукт по фото"
+                  : "Добавить продукт"
+        }
         placement="bottom"
         compact={false}
         solid
         noBackdrop
+        full
       >
         {addTo && (
           <AddFood
@@ -605,34 +619,34 @@ function EntryEditor({
   const quickValues = [30, 50, 100, 150, 200, 250, 300];
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       <div className="flex items-baseline justify-between gap-2">
-        <div className="min-w-0 truncate text-sm font-semibold">{action.entry.name}</div>
+        <div className="min-w-0 text-sm leading-snug font-semibold break-words">{action.entry.name}</div>
         <div className="shrink-0 text-[11px] whitespace-nowrap text-mute">{action.entry.kcal} ккал/100 г</div>
       </div>
       <Field label="Количество, г / мл">
-        <div className="flex items-center gap-2">
-          <IconBtn onClick={() => changeGrams(Math.max(0, value - 10))} title="Уменьшить на 10 г" size={48} className="text-xl font-bold">
-            −
+        <div className="flex items-center gap-1.5">
+          <IconBtn onClick={() => changeGrams(Math.max(0, value - 10))} title="Уменьшить на 10 г" size={40}>
+            <span className="block -translate-y-px text-lg leading-none font-bold">−</span>
           </IconBtn>
           <input
-            className="field min-w-0 py-3.5 text-center text-2xl font-bold"
+            className="field min-w-0 py-2 text-center text-lg font-bold"
             {...numField}
             value={grams}
             onChange={(event) => changeGrams(event.target.value)}
           />
-          <IconBtn onClick={() => changeGrams(value + 10)} title="Увеличить на 10 г" size={48} className="text-xl font-bold">
-            +
+          <IconBtn onClick={() => changeGrams(value + 10)} title="Увеличить на 10 г" size={40}>
+            <span className="block -translate-y-px text-lg leading-none font-bold">+</span>
           </IconBtn>
         </div>
       </Field>
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-7 gap-1">
         {quickValues.map((quick) => (
           <button
             type="button"
             key={quick}
             onClick={() => changeGrams(quick)}
-            className={`rounded-xl border py-2.5 text-sm font-semibold transition active:scale-95 ${
+            className={`rounded-lg border py-1.5 text-xs font-semibold transition active:scale-95 ${
               value === quick ? "border-acc bg-acc/20 text-acc" : "border-line bg-panel2 hover:border-acc2/60"
             }`}
           >
@@ -641,10 +655,10 @@ function EntryEditor({
         ))}
       </div>
       <div className="flex gap-2">
-        <Btn variant="soft" className="flex-1 py-3" onClick={onCancel}>
+        <Btn variant="soft" className="flex-1" onClick={onCancel}>
           Отмена
         </Btn>
-        <Btn className="flex-[2] py-3 text-base" disabled={value <= 0} onClick={() => onSave(value)}>
+        <Btn className="flex-[2]" disabled={value <= 0} onClick={() => onSave(value)}>
           Сохранить
         </Btn>
       </div>

@@ -50,6 +50,13 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 }
 .field:focus { background: rgb(18 12 34 / .8); border-color: var(--color-acc2); box-shadow: 0 0 0 3px rgb(45 212 191 / .18); }
 .field::placeholder { color: rgb(176 162 207 / .65); }
+/* Компактный вариант поля — для мобильных форм продукта / порции */
+.field.compact { padding: .55rem .75rem; font-size: .9rem; border-radius: .7rem; }
+/* На мобильном поля от 16px — иначе iOS зумит фокус и дёргает клавиатуру */
+@media (max-width: 640px) { .field, .field.compact { font-size: 16px; } }
+/* Поиск: убрать нативный крестик/декор type=search */
+input[type="search"]::-webkit-search-decoration,
+input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
 input[type="date"], input[type="time"] { color-scheme: dark; }
 :focus-visible { outline: 2px solid rgb(45 212 191 / .75); outline-offset: 2px; }
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }

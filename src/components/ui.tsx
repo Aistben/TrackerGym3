@@ -37,19 +37,33 @@ export function Sheet({
 
   if (!open) return null;
   return (
-    <div className={`fixed inset-0 z-50 flex justify-center ${placement === "center" ? "items-center p-4" : "items-end p-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))]"}`}>
-      {!noBackdrop && <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />}
+    <div
+      className={`fixed inset-0 z-50 flex justify-center ${
+        full ? "items-stretch p-0 sm:items-center sm:p-4" : placement === "center" ? "items-center p-4" : "items-end p-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))]"
+      }`}
+    >
+      {/* Без тёмной подложки (noBackdrop) слой всё равно перехватывает клики —
+          иначе под окном можно было нажимать кнопки и открыть вторую форму поверх первой */}
+      {noBackdrop ? (
+        <div className="absolute inset-0 touch-none" onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()} />
+      ) : (
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      )}
       <div
         style={solid ? { background: "#241a40" } : undefined}
-        className={`sheet-in relative w-full ${compact ? "max-w-sm" : "max-w-lg"} overflow-hidden border border-line ${solid ? "backdrop-blur-none" : "bg-panel"} shadow-2xl shadow-black/60 ${
-          placement === "center"
-            ? `${compact ? "max-h-[72vh]" : "max-h-[88vh]"} rounded-3xl`
-            : compact
-              ? "max-h-[58vh] rounded-3xl"
-              : "max-h-[74vh] rounded-3xl"
-        } ${full ? "h-[92vh] sm:h-[80vh]" : "max-h-[90vh]"} flex flex-col`}
+        className={`sheet-in relative w-full overflow-hidden border-line ${solid ? "backdrop-blur-none" : "bg-panel"} shadow-2xl shadow-black/60 ${
+          full
+            ? "h-[100dvh] max-h-none max-w-lg rounded-none border-0 sm:h-[92vh] sm:max-h-[92vh] sm:rounded-3xl sm:border"
+            : `${compact ? "max-w-sm" : "max-w-lg"} border ${
+                placement === "center"
+                  ? `${compact ? "max-h-[72vh]" : "max-h-[88vh]"} rounded-3xl`
+                  : compact
+                    ? "max-h-[58vh] rounded-3xl"
+                    : "max-h-[74vh] rounded-3xl"
+              } max-h-[90vh]`
+        } flex flex-col`}
       >
-        <div className={`${placement === "center" ? "hidden" : "flex"} shrink-0 flex-col pt-2 sm:hidden`}>
+        <div className={`${placement === "center" || full ? "hidden" : "flex"} shrink-0 flex-col pt-2 sm:hidden`}>
           <div className="mx-auto h-1.5 w-10 rounded-full bg-line" />
         </div>
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-3">
@@ -83,7 +97,7 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[11px] font-semibold tracking-wide text-mute uppercase">{label}</span>
+      <span className="mb-1 block text-[11px] font-semibold tracking-wide text-mute uppercase">{label}</span>
       {children}
       {hint && <span className="mt-1 block text-xs text-mute">{hint}</span>}
     </label>
@@ -171,17 +185,17 @@ export function Tabs<T extends string | number>({
   onChange: (v: T) => void;
   items: { key: T; label: ReactNode }[];
   className?: string;
+  /** fill=false — кнопки по содержимому, подписи не обрезаются (весь текст виден) */
   fill?: boolean;
 }) {
   return (
-    <div className={`flex gap-1 rounded-xl border border-line bg-panel2/60 p-1 ${className}`}>
+    <div className={`flex justify-center gap-1 rounded-xl border border-line bg-panel2/60 p-1 ${className}`}>
       {items.map((it) => (
         <button
           key={it.key}
           onClick={() => onChange(it.key)}
-          className={`truncate rounded-lg px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
-            fill ? "flex-1" : ""
-          } ${value === it.key ? "bg-acc text-white shadow-sm shadow-acc/30" : "text-mute hover:text-ink"}`}
+          className={`${fill ? "min-w-0 flex-1 truncate" : "shrink-0"} rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
+            value === it.key ? "bg-acc text-white shadow-sm shadow-acc/30" : "text-mute hover:text-ink"}`}
         >
           {it.label}
         </button>
@@ -254,12 +268,15 @@ export function Empty({ icon, text }: { icon: string; text: string }) {
 }
 
 /** Общие атрибуты полей: гасят автозаполнение/подсказки браузера
- * (та самая белая панель над клавиатурой с «ключ-картами» и т.п.) */
+ * (та самая белая панель над клавиатурой с «ключ-картами» и т.п.).
+ * Случайное name отбивает у Safari/менеджеров паролей желание
+ * показывать плашку автозаполнения — она срабатывает на «говорящие» имена. */
 export const noSuggest = {
   autoComplete: "off",
   autoCorrect: "off",
   autoCapitalize: "off",
   spellCheck: false,
+  name: `tg-${Math.random().toString(36).slice(2, 10)}`,
   "data-form-type": "other",
   "data-lpignore": "true",
   "data-1p-ignore": "true",

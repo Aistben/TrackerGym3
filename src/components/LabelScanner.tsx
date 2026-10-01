@@ -77,10 +77,10 @@ export default function LabelScanner({ onRead }: { onRead: (values: LabelValues)
   }
 
   return (
-    <div className="rounded-2xl border border-acc2/25 bg-acc2/8 p-3">
-      <div className="mb-1 text-sm font-semibold">📷 Заполнить БЖУ по фотографии</div>
-      <p className="mb-3 text-xs leading-relaxed text-mute">
-        Сфотографируй крупно таблицу пищевой ценности «на 100 г». Распознавание работает на русском и английском.
+    <div className="rounded-xl border border-acc2/25 bg-acc2/8 px-3 py-2.5">
+      <div className="text-[13px] font-semibold">📷 БЖУ по фото этикетки</div>
+      <p className="mt-0.5 mb-2 text-[11px] leading-snug text-mute">
+        Сними крупно таблицу «на 100 г» — поля заполнятся сами (рус/англ).
       </p>
       <input
         ref={inputRef}
@@ -90,10 +90,10 @@ export default function LabelScanner({ onRead }: { onRead: (values: LabelValues)
         hidden
         onChange={(event) => event.target.files?.[0] && recognize(event.target.files[0])}
       />
-      <Btn variant="soft" className="w-full" disabled={busy} onClick={() => inputRef.current?.click()}>
+      <Btn variant="soft" size="sm" className="w-full" disabled={busy} onClick={() => inputRef.current?.click()}>
         {busy ? `${message} ${progress ? progress + "%" : ""}` : "Снять этикетку / выбрать фото"}
       </Btn>
-      {message && !busy && <div className="mt-2 text-xs leading-relaxed text-acc2">{message}</div>}
+      {message && !busy && <div className="mt-1.5 text-[11px] leading-snug text-acc2">{message}</div>}
     </div>
   );
 }
