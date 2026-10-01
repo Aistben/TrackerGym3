@@ -269,11 +269,11 @@ export default function DayView({
       </div>
       <div className="text-center text-[11px] text-mute">Свайп влево или вправо — другой день</div>
 
+      <div className="sticky top-0 z-40 pt-1 pb-2">
       <div
-        className="sticky top-0 z-40 -mx-4 px-4 pt-1 pb-2 backdrop-blur-xl"
-        style={{ background: "linear-gradient(180deg, rgb(21 15 38 / .97) 70%, rgb(21 15 38 / .8))" }}
+        className="card flex items-center gap-4 p-4"
+        style={{ background: "linear-gradient(145deg, #30235a, #241a40)" }}
       >
-      <div className="card flex items-center gap-4 p-4">
         <Ring
           value={totals.kcal}
           max={targets.calories}
