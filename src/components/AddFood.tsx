@@ -11,17 +11,19 @@ type Mode = "search" | "scan" | "create" | "portion";
 export default function AddFood({
   products,
   mealTitle,
+  startMode = "search",
   onSaveProduct,
   onAdd,
   onClose,
 }: {
   products: Product[];
   mealTitle: string;
+  startMode?: Mode;
   onSaveProduct: (p: Product) => void;
   onAdd: (entry: MealEntry) => void;
   onClose: () => void;
 }) {
-  const [mode, setMode] = useState<Mode>("search");
+  const [mode, setMode] = useState<Mode>(startMode);
   const [q, setQ] = useState("");
   const [picked, setPicked] = useState<Product | null>(null);
   const [grams, setGrams] = useState("100");

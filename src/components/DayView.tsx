@@ -28,6 +28,8 @@ export default function DayView({
   setDate: (d: string) => void;
 }) {
   const [addTo, setAddTo] = useState<Meal | null>(null);
+  const [addMode, setAddMode] = useState<"search" | "scan">("search");
+  const [scanPick, setScanPick] = useState(false);
   const [newMeal, setNewMeal] = useState(false);
   const [moveMeal, setMoveMeal] = useState<Meal | null>(null);
   const [editMeal, setEditMeal] = useState<Meal | null>(null);
@@ -165,7 +167,10 @@ export default function DayView({
             </div>
 
             <button
-              onClick={() => setAddTo(meal)}
+              onClick={() => {
+                setAddMode("search");
+                setAddTo(meal);
+              }}
               className="w-full border-t border-line py-2.5 text-sm font-medium text-acc transition hover:bg-acc/5"
             >
               + Добавить продукт
@@ -180,17 +185,75 @@ export default function DayView({
         + Новый приём пищи
       </Btn>
 
+      {/* Быстрый скан штрихкода */}
+      <button
+        onClick={() => setScanPick(true)}
+        title="Сканировать штрихкод"
+        className="fixed right-4 bottom-20 z-40 grid size-14 place-items-center rounded-full bg-acc text-2xl text-ink shadow-lg shadow-acc/20 transition active:scale-95"
+      >
+        📷
+      </button>
+
+      <Sheet open={scanPick} onClose={() => setScanPick(false)} title="Сканировать штрихкод">
+        <div className="space-y-3">
+          <p className="text-sm text-mute">Куда добавить найденный продукт?</p>
+          {meals.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => {
+                setAddMode("scan");
+                setAddTo(m);
+                setScanPick(false);
+              }}
+              className="flex w-full items-center gap-3 rounded-xl border border-line bg-panel2 px-3 py-3 text-left transition hover:border-acc/60"
+            >
+              <span className="rounded-lg bg-panel px-2 py-1 font-mono text-xs text-acc2">{m.time}</span>
+              <span className="flex-1 text-sm font-medium">{m.title}</span>
+              <span className="text-xs text-mute">{m.entries.length} поз.</span>
+            </button>
+          ))}
+          <Btn
+            variant="soft"
+            className="w-full"
+            onClick={() => {
+              const now = new Date();
+              const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+              const meal: Meal = { id: uid(), date, title: "Перекус", time, entries: [] };
+              update((ms) => [...ms, meal]);
+              setAddMode("scan");
+              setAddTo(meal);
+              setScanPick(false);
+            }}
+          >
+            ➕ Новый приём пищи сейчас
+          </Btn>
+        </div>
+      </Sheet>
+
       {/* Лист добавления продукта */}
-      <Sheet open={!!addTo} onClose={() => setAddTo(null)} title={`${addTo?.time} · ${addTo?.title}`} full>
+      <Sheet
+        open={!!addTo}
+        onClose={() => {
+          setAddTo(null);
+          setAddMode("search");
+        }}
+        title={`${addTo?.time} · ${addTo?.title}`}
+        full
+      >
         {addTo && (
           <AddFood
+            key={addTo.id + addMode}
             products={state.products}
             mealTitle={addTo.title}
+            startMode={addMode}
             onSaveProduct={(p: Product) =>
               setState((s) => ({ ...s, products: [p, ...s.products.filter((x) => x.id !== p.id)] }))
             }
             onAdd={(e) => addEntry(addTo.id, e)}
-            onClose={() => setAddTo(null)}
+            onClose={() => {
+              setAddTo(null);
+              setAddMode("search");
+            }}
           />
         )}
       </Sheet>
