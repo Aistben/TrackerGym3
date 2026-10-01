@@ -190,7 +190,10 @@ export default function ProfileView({
             </p>
           </>
         )}
-        <p className="text-xs text-mute">Расчёт по формуле Миффлина–Сан Жеора, вес учитывается текущий: {round(currentWeight, 1)} кг</p>
+        <div className="rounded-xl border border-acc2/20 bg-acc2/8 p-3 text-xs leading-relaxed text-mute">
+          <span className="font-semibold text-acc2">Как считается БЖУ:</span> белок — по текущему весу, жиры — 30% калорий, углеводы — оставшиеся калории. Поэтому высокая активность или профицит прежде всего увеличивают углеводы. Можно включить ручной режим и указать, например, 155 / 103 / 387 — это 3095 ккал.
+        </div>
+        <p className="text-xs text-mute">Расчёт калорий по формуле Миффлина–Сан Жеора, вес учитывается текущий: {round(currentWeight, 1)} кг</p>
       </div>
 
       <div className="card space-y-2 p-4">

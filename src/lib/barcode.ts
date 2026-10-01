@@ -47,3 +47,10 @@ export function normalizeGtin(code: string): string {
   if (c.length === 12) c = "0" + c;
   return c;
 }
+
+/** Сравнивает UPC/EAN/GTIN независимо от ведущих упаковочных нулей. */
+export function sameBarcode(a?: string, b?: string): boolean {
+  if (!a || !b) return false;
+  const compact = (value: string) => normalizeGtin(value).replace(/^0+/, "");
+  return compact(a) === compact(b);
+}
