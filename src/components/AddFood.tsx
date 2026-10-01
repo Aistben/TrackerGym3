@@ -4,7 +4,7 @@ import { round } from "../lib/nutrition";
 import { uid } from "../lib/storage";
 import { lookupBarcode, searchOnline } from "../lib/openfoodfacts";
 import { sameBarcode } from "../lib/barcode";
-import { Btn, Empty, Field, IconBtn, Sheet, Tabs } from "./ui";
+import { Btn, Empty, Field, IconBtn, Sheet, Tabs, noSuggest, numField } from "./ui";
 import Scanner from "./Scanner";
 import LabelScanner from "./LabelScanner";
 
@@ -16,7 +16,6 @@ const blankDraft = { name: "", brand: "", kcal: "", protein: "", fat: "", carbs:
 export default function AddFood({
   products,
   recentProductIds,
-  mealTitle,
   startMode = "search",
   onSaveProduct,
   onDeleteProduct,
@@ -24,6 +23,8 @@ export default function AddFood({
   onAdd,
   onClose,
   onNotice,
+  onPortionPreview,
+  onModeChange,
 }: {
   products: Product[];
   recentProductIds: string[];
@@ -35,6 +36,9 @@ export default function AddFood({
   onAdd: (entry: MealEntry) => void;
   onClose: () => void;
   onNotice?: (message: string) => void;
+  /** живой предпросмотр порции — чтобы график сверху пересчитывался на лету */
+  onPortionPreview?: (preview: { product: Product; grams: number } | null) => void;
+  onModeChange?: (mode: "search" | "scan" | "form" | "portion" | "photo") => void;
 }) {
   const [mode, setMode] = useState<Mode>(startMode);
   const [lib, setLib] = useState<Lib>(recentProductIds.length ? "recent" : "base");
@@ -48,6 +52,20 @@ export default function AddFood({
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
   const [draft, setDraft] = useState({ ...blankDraft });
   const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    onModeChange?.(mode);
+  }, [mode, onModeChange]);
+
+  useEffect(() => {
+    if (mode !== "portion" || !picked) {
+      onPortionPreview?.(null);
+      return;
+    }
+    onPortionPreview?.({ product: picked, grams: Math.max(0, Number(grams) || 0) });
+  }, [mode, picked, grams, onPortionPreview]);
+
+  useEffect(() => () => onPortionPreview?.(null), [onPortionPreview]);
 
   const recent = useMemo(
     () => recentProductIds.map((id) => products.find((p) => p.id === id)).filter((p): p is Product => !!p),
@@ -230,65 +248,84 @@ export default function AddFood({
     const g = +grams || 0;
     const k = g / 100;
     return (
-      <div className="space-y-4">
-        <div className="card p-4">
-          <div className="truncate font-semibold">{picked.name}</div>
-          {picked.brand && <div className="truncate text-xs text-mute">{picked.brand}</div>}
-          <div className="mt-1 text-xs text-mute">
-            на 100 г: {picked.kcal} ккал · Б {picked.protein} · Ж {picked.fat} · У {picked.carbs}
+      <div className="space-y-3">
+        <div className="card px-3 py-2.5">
+          <div className="truncate text-sm font-semibold">{picked.name}</div>
+          <div className="truncate text-[11px] text-mute">
+            {picked.brand ? picked.brand + " · " : ""}на 100 г: {picked.kcal} ккал · Б {picked.protein} · Ж {picked.fat} · У {picked.carbs}
           </div>
         </div>
 
-        <Field label="Количество, г / мл">
-          <input
-            className="field text-lg"
-            inputMode="decimal"
-            autoFocus
-            value={grams}
-            onChange={(e) => setGrams(e.target.value.replace(",", "."))}
-          />
-        </Field>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setGrams(String(Math.max(0, (+grams || 0) - 10)))}
+            className="grid size-12 shrink-0 place-items-center rounded-xl border border-line bg-panel2 text-xl font-bold transition active:scale-95"
+          >
+            −
+          </button>
+          <div className="relative min-w-0 flex-1">
+            <input
+              className="field min-w-0 py-3.5 pr-14 text-center text-2xl font-bold"
+              {...numField}
+              value={grams}
+              onChange={(e) => setGrams(e.target.value.replace(",", "."))}
+            />
+            <span className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-xs text-mute">г / мл</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setGrams(String((+grams || 0) + 10))}
+            className="grid size-12 shrink-0 place-items-center rounded-xl border border-line bg-panel2 text-xl font-bold transition active:scale-95"
+          >
+            +
+          </button>
+        </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-4 gap-2">
           {[30, 50, 100, 150, 200, 250].map((v) => (
             <button
               key={v}
+              type="button"
               onClick={() => setGrams(String(v))}
-              className="rounded-lg border border-line bg-panel2 px-3 py-1.5 text-xs whitespace-nowrap transition hover:border-acc2/60"
+              className={`rounded-xl border py-2.5 text-sm font-semibold whitespace-nowrap transition active:scale-95 ${
+                +grams === v ? "border-acc bg-acc/20 text-acc" : "border-line bg-panel2 hover:border-acc2/60"
+              }`}
             >
-              {v} г
+              {v}
             </button>
           ))}
           {picked.portion && (
             <button
+              type="button"
               onClick={() => setGrams(String(picked.portion))}
-              className="rounded-lg border border-acc/40 bg-acc/10 px-3 py-1.5 text-xs whitespace-nowrap text-acc"
+              className="col-span-2 rounded-xl border border-acc/40 bg-acc/10 py-2.5 text-sm font-semibold whitespace-nowrap text-acc active:scale-95"
             >
-              1 порция · {picked.portion} г
+              порция · {picked.portion}
             </button>
           )}
         </div>
 
-        <div className="grid grid-cols-4 gap-2 text-center">
+        <div className="grid grid-cols-4 gap-1.5 text-center">
           {[
             ["Ккал", round(picked.kcal * k)],
             ["Белки", round(picked.protein * k, 1)],
             ["Жиры", round(picked.fat * k, 1)],
             ["Углев.", round(picked.carbs * k, 1)],
           ].map(([l, v]) => (
-            <div key={l as string} className="card px-1.5 py-3">
-              <div className="truncate text-lg font-bold">{v}</div>
-              <div className="truncate text-[11px] text-mute">{l}</div>
+            <div key={l as string} className="card px-1 py-2">
+              <div className="truncate text-base font-bold">{v}</div>
+              <div className="truncate text-[10px] text-mute">{l}</div>
             </div>
           ))}
         </div>
 
         <div className="flex gap-2">
-          <Btn variant="soft" className="flex-1" onClick={() => setMode("search")}>
+          <Btn variant="soft" className="flex-1 py-3" onClick={() => setMode("search")}>
             Назад
           </Btn>
-          <Btn className="flex-[2]" disabled={g <= 0} onClick={confirmAdd}>
-            {mealTitle ? `Добавить в «${mealTitle}»` : "Добавить"}
+          <Btn className="flex-[2] py-3 text-base" disabled={g <= 0} onClick={confirmAdd}>
+            Добавить
           </Btn>
         </div>
       </div>
@@ -304,15 +341,16 @@ export default function AddFood({
       <div className="space-y-3">
         {notice && <div className="rounded-xl border border-warn/30 bg-warn/10 p-3 text-xs text-warn">{notice}</div>}
         <Field label="Название">
-          <input className="field" autoFocus value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+          <input className="field" {...noSuggest} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Бренд">
-            <input className="field" value={draft.brand} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} />
+            <input className="field" {...noSuggest} value={draft.brand} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} />
           </Field>
           <Field label="Штрихкод">
             <input
               className="field"
+              {...numField}
               inputMode="numeric"
               value={draft.barcode}
               onChange={(e) => setDraft({ ...draft, barcode: e.target.value.replace(/\D/g, "") })}
@@ -338,7 +376,7 @@ export default function AddFood({
             <Field key={key} label={label}>
               <input
                 className="field"
-                inputMode="decimal"
+                {...numField}
                 value={draft[key]}
                 onChange={(e) => setDraft({ ...draft, [key]: e.target.value.replace(",", ".") })}
               />
@@ -367,7 +405,7 @@ export default function AddFood({
           placeholder="Найти продукт по названию…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          autoFocus
+          {...noSuggest}
         />
         <IconBtn onClick={() => setMode("scan")} title="Дополнительно: сканировать штрихкод" size={44}>
           <span className="text-lg">📷</span>

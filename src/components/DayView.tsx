@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AppState, Meal, MealEntry, Product, Targets } from "../lib/types";
 import { dayTotals, entryTotals, humanDate, round, shiftDate, sumTotals, today } from "../lib/nutrition";
 import { uid } from "../lib/storage";
-import { Bar, Btn, Empty, Field, IconBtn, Ring, Sheet } from "./ui";
+import { Bar, Btn, Empty, Field, IconBtn, Ring, Sheet, noSuggest, numField } from "./ui";
 import AddFood from "./AddFood";
 
 type EntryAction = { mealId: string; mealTitle: string; entry: MealEntry };
@@ -34,6 +34,8 @@ export default function DayView({
   const [notice, setNotice] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ mealId: string; entryId: string; grams: number } | null>(null);
   const [tempMealId, setTempMealId] = useState<string | null>(null);
+  const [draftPreview, setDraftPreview] = useState<{ product: Product; grams: number } | null>(null);
+  const [addStep, setAddStep] = useState<"search" | "scan" | "form" | "portion" | "photo">("search");
   const lastPhotoRequest = useRef(0);
   const noticeTimer = useRef<number | null>(null);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
@@ -52,7 +54,18 @@ export default function DayView({
         : meal,
     );
   }, [meals, preview]);
-  const totals = dayTotals(visibleMeals);
+  const baseTotals = dayTotals(visibleMeals);
+  const totals = useMemo(() => {
+    if (!draftPreview) return baseTotals;
+    const k = draftPreview.grams / 100;
+    const p = draftPreview.product;
+    return {
+      kcal: baseTotals.kcal + p.kcal * k,
+      protein: baseTotals.protein + p.protein * k,
+      fat: baseTotals.fat + p.fat * k,
+      carbs: baseTotals.carbs + p.carbs * k,
+    };
+  }, [baseTotals, draftPreview]);
   const left = Math.max(0, targets.calories - totals.kcal);
   const hasOverlay = !!(
     addTo ||
@@ -63,6 +76,15 @@ export default function DayView({
     moveEntry ||
     deleteMeal ||
     calendarOpen
+  );
+
+  const handlePortionPreview = useCallback(
+    (preview: { product: Product; grams: number } | null) => setDraftPreview(preview),
+    [],
+  );
+  const handleAddModeChange = useCallback(
+    (step: "search" | "scan" | "form" | "portion" | "photo") => setAddStep(step),
+    [],
   );
 
   const update = (fn: (ms: Meal[]) => Meal[]) => setState((s) => ({ ...s, meals: fn(s.meals) }));
@@ -118,6 +140,8 @@ export default function DayView({
   }
 
   function closeAddFood() {
+    setDraftPreview(null);
+    setAddStep("search");
     const temporaryId = tempMealId;
     if (temporaryId) {
       update((ms) => ms.filter((meal) => meal.id !== temporaryId || meal.entries.length > 0));
@@ -245,7 +269,11 @@ export default function DayView({
       </div>
       <div className="text-center text-[11px] text-mute">Свайп влево или вправо — другой день</div>
 
-      <div className="card flex items-center gap-4 p-4">
+      <div className="sticky top-0 z-40 pt-1 pb-2">
+      <div
+        className="card flex items-center gap-4 p-4"
+        style={{ background: "linear-gradient(145deg, #30235a, #241a40)" }}
+      >
         <Ring
           value={totals.kcal}
           max={targets.calories}
@@ -268,6 +296,26 @@ export default function DayView({
         </div>
       </div>
 
+      {editEntry && (
+        <div className="rise mt-2 rounded-2xl border border-line p-3 shadow-xl shadow-black/40" style={{ background: "#241a40" }} data-no-swipe>
+          <EntryEditor
+            action={editEntry}
+            onPreview={(grams) => setPreview({ mealId: editEntry.mealId, entryId: editEntry.entry.id, grams })}
+            onSave={(grams) => {
+              updateEntry(editEntry.mealId, editEntry.entry.id, grams);
+              setPreview(null);
+              setEditEntry(null);
+              notify("Количество продукта изменено");
+            }}
+            onCancel={() => {
+              setPreview(null);
+              setEditEntry(null);
+            }}
+          />
+        </div>
+      )}
+      </div>
+
       {visibleMeals.map((meal) => {
         const t = sumTotals(meal.entries);
         return (
@@ -285,8 +333,11 @@ export default function DayView({
                 {meal.title?.trim() && meal.title.trim() !== "Приём" && (
                   <div className="truncate text-sm font-semibold">{meal.title.trim()}</div>
                 )}
-                <div className="truncate text-[11px] text-mute">
-                  {round(t.kcal)} ккал · Б {round(t.protein)} · Ж {round(t.fat)} · У {round(t.carbs)}
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] font-semibold">
+                  <span className="text-ink">{round(t.kcal)} ккал</span>
+                  <span className="text-acc2">Б {round(t.protein)}</span>
+                  <span className="text-warn">Ж {round(t.fat)}</span>
+                  <span className="text-acc">У {round(t.carbs)}</span>
                 </div>
               </div>
               <IconBtn onClick={() => copyMeal(meal, shiftDate(date, 1))} title="Копия на завтра" size={32}>
@@ -324,8 +375,11 @@ export default function DayView({
                     >
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm">{entry.name}</div>
-                        <div className="truncate text-[11px] text-mute">
-                          {round(entry.grams)} г · Б {round(totalsForEntry.protein, 1)} · Ж {round(totalsForEntry.fat, 1)} · У {round(totalsForEntry.carbs, 1)}
+                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px]">
+                          <span className="text-mute">{round(entry.grams)} г</span>
+                          <span className="font-semibold text-acc2">Б {round(totalsForEntry.protein, 1)}</span>
+                          <span className="font-semibold text-warn">Ж {round(totalsForEntry.fat, 1)}</span>
+                          <span className="font-semibold text-acc">У {round(totalsForEntry.carbs, 1)}</span>
                         </div>
                       </div>
                       <div className="shrink-0 text-sm font-medium">{round(totalsForEntry.kcal)}</div>
@@ -400,7 +454,15 @@ export default function DayView({
         </div>
       </Sheet>
 
-      <Sheet open={!!addTo} onClose={closeAddFood} title="Добавить продукт">
+      <Sheet
+        open={!!addTo}
+        onClose={closeAddFood}
+        title={addStep === "portion" ? "Количество" : "Добавить продукт"}
+        placement="bottom"
+        compact={false}
+        solid
+        noBackdrop
+      >
         {addTo && (
           <AddFood
             key={addTo.id + addMode}
@@ -424,6 +486,8 @@ export default function DayView({
             onAdd={(entry) => addEntry(addTo.id, entry)}
             onClose={closeAddFood}
             onNotice={notify}
+            onPortionPreview={handlePortionPreview}
+            onModeChange={handleAddModeChange}
           />
         )}
       </Sheet>
@@ -433,12 +497,11 @@ export default function DayView({
           onCreate={(title, time) => {
             addMeal(title, time);
             setNewMeal(false);
-            notify("Новый приём добавлен");
           }}
         />
       </Sheet>
 
-      <Sheet open={!!timePick} onClose={() => setTimePick(null)} title="Время" center>
+      <Sheet open={!!timePick} onClose={() => setTimePick(null)} title="Время" center compact>
         {timePick && (
           <TimePicker
             value={timePick.time}
@@ -447,42 +510,6 @@ export default function DayView({
               update((ms) => ms.map((m) => (m.id === timePick.id ? { ...m, title, time } : m)));
               setTimePick(null);
               notify("Приём изменён");
-            }}
-          />
-        )}
-      </Sheet>
-
-      <Sheet
-        open={!!editEntry}
-        onClose={() => {
-          setPreview(null);
-          setEditEntry(null);
-        }}
-        title={editEntry?.entry.name || "Продукт"}
-        placement="bottom"
-        compact
-        noBackdrop
-      >
-        {editEntry && (
-          <EntryEditor
-            action={editEntry}
-            onPreview={(grams) => setPreview({ mealId: editEntry.mealId, entryId: editEntry.entry.id, grams })}
-            onSave={(grams) => {
-              updateEntry(editEntry.mealId, editEntry.entry.id, grams);
-              setPreview(null);
-              setEditEntry(null);
-              notify("Количество продукта изменено");
-            }}
-            onMove={() => {
-              setPreview(null);
-              setMoveEntry(editEntry);
-              setEditEntry(null);
-            }}
-            onDelete={() => {
-              removeEntry(editEntry.mealId, editEntry.entry.id);
-              setPreview(null);
-              setEditEntry(null);
-              notify("Продукт удалён");
             }}
           />
         )}
@@ -560,14 +587,12 @@ function EntryEditor({
   action,
   onPreview,
   onSave,
-  onMove,
-  onDelete,
+  onCancel,
 }: {
   action: EntryAction;
   onPreview: (grams: number) => void;
   onSave: (grams: number) => void;
-  onMove: () => void;
-  onDelete: () => void;
+  onCancel: () => void;
 }) {
   const [grams, setGrams] = useState(String(action.entry.grams));
   const value = Math.max(0, Number(grams.replace(",", ".")) || 0);
@@ -577,70 +602,50 @@ function EntryEditor({
     setGrams(text);
     onPreview(numeric);
   };
-  const total = entryTotals({ ...action.entry, grams: value });
   const quickValues = [30, 50, 100, 150, 200, 250, 300];
 
   return (
-    <div className="space-y-4">
-      <div className="card p-4">
-        <div className="font-semibold">{action.entry.name}</div>
-        <div className="mt-1 text-xs text-mute">
-          {action.mealTitle && `${action.mealTitle} · `}на 100 г: {action.entry.kcal} ккал
-        </div>
+    <div className="space-y-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <div className="min-w-0 truncate text-sm font-semibold">{action.entry.name}</div>
+        <div className="shrink-0 text-[11px] whitespace-nowrap text-mute">{action.entry.kcal} ккал/100 г</div>
       </div>
       <Field label="Количество, г / мл">
         <div className="flex items-center gap-2">
-          <IconBtn onClick={() => changeGrams(Math.max(0, value - 10))} title="Уменьшить на 10 г" size={44}>
+          <IconBtn onClick={() => changeGrams(Math.max(0, value - 10))} title="Уменьшить на 10 г" size={48} className="text-xl font-bold">
             −
           </IconBtn>
           <input
-            className="field text-center text-lg"
-            inputMode="decimal"
-            autoFocus
+            className="field min-w-0 py-3.5 text-center text-2xl font-bold"
+            {...numField}
             value={grams}
             onChange={(event) => changeGrams(event.target.value)}
           />
-          <IconBtn onClick={() => changeGrams(value + 10)} title="Увеличить на 10 г" size={44}>
+          <IconBtn onClick={() => changeGrams(value + 10)} title="Увеличить на 10 г" size={48} className="text-xl font-bold">
             +
           </IconBtn>
         </div>
       </Field>
-      <div className="flex flex-wrap justify-center gap-2">
+      <div className="grid grid-cols-4 gap-2">
         {quickValues.map((quick) => (
           <button
             type="button"
             key={quick}
             onClick={() => changeGrams(quick)}
-            className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
-              value === quick ? "border-acc bg-acc/15 text-acc" : "border-line bg-panel2 hover:border-acc2/60"
+            className={`rounded-xl border py-2.5 text-sm font-semibold transition active:scale-95 ${
+              value === quick ? "border-acc bg-acc/20 text-acc" : "border-line bg-panel2 hover:border-acc2/60"
             }`}
           >
             {quick}
           </button>
         ))}
       </div>
-      <div className="grid grid-cols-4 gap-2 text-center">
-        {[
-          ["Ккал", round(total.kcal)],
-          ["Белки", round(total.protein, 1)],
-          ["Жиры", round(total.fat, 1)],
-          ["Углев.", round(total.carbs, 1)],
-        ].map(([label, number]) => (
-          <div key={label as string} className="card px-1.5 py-3">
-            <div className="truncate text-lg font-bold">{number}</div>
-            <div className="truncate text-[11px] text-mute">{label}</div>
-          </div>
-        ))}
-      </div>
-      <Btn className="w-full" disabled={value <= 0} onClick={() => onSave(value)}>
-        Сохранить граммы
-      </Btn>
-      <div className="grid grid-cols-2 gap-2">
-        <Btn variant="soft" onClick={onMove}>
-          Перенести в другой приём
+      <div className="flex gap-2">
+        <Btn variant="soft" className="flex-1 py-3" onClick={onCancel}>
+          Отмена
         </Btn>
-        <Btn variant="danger" onClick={onDelete}>
-          Удалить продукт
+        <Btn className="flex-[2] py-3 text-base" disabled={value <= 0} onClick={() => onSave(value)}>
+          Сохранить
         </Btn>
       </div>
     </div>
@@ -769,10 +774,18 @@ function CalendarView({
 }
 
 function CenterNotice({ message }: { message: string }) {
+  // Тост внизу экрана, в одну линию с круглой кнопкой камеры
   return (
-    <div className="pointer-events-none fixed inset-0 z-[70] grid place-items-center p-4">
-      <div className="rounded-2xl border border-acc2/40 bg-panel px-5 py-3 text-center text-sm font-semibold text-ink shadow-2xl shadow-black/15 backdrop-blur-xl">
-        ✓ {message}
+    <div
+      className="pointer-events-none fixed z-[70] flex justify-start"
+      style={{
+        left: "max(1rem, calc((100vw - 32rem) / 2 + 1rem))",
+        right: "max(5.25rem, calc((100vw - 32rem) / 2 + 5.25rem))",
+        bottom: "calc(5.75rem + env(safe-area-inset-bottom))",
+      }}
+    >
+      <div className="rise flex min-h-14 w-full items-center rounded-2xl border border-acc2/40 bg-panel px-4 py-2 text-left text-[13px] leading-snug font-semibold text-ink shadow-xl shadow-black/15 backdrop-blur-xl">
+        <span className="line-clamp-2">✓ {message}</span>
       </div>
     </div>
   );
@@ -805,24 +818,23 @@ function TimePicker({
   }, []);
 
   return (
-    <div className="space-y-4">
-      <Field label="Название (необязательно)">
-        <input
-          className="field"
-          value={mealName}
-          onChange={(event) => setMealName(event.target.value)}
-          placeholder="Оставьте пустым"
-        />
-      </Field>
+    <div className="space-y-3">
+      <input
+        className="field py-2 text-sm"
+        {...noSuggest}
+        value={mealName}
+        onChange={(event) => setMealName(event.target.value)}
+        placeholder="Название приёма (необязательно)"
+      />
       <div>
-        <p className="text-sm text-mute">Проведи пальцем по часам и минутам — выбранное значение будет в центре.</p>
-        <div className="relative mt-4 grid grid-cols-2 gap-3 overflow-hidden rounded-2xl border border-line bg-panel2/60 p-2">
-          <div className="pointer-events-none absolute inset-x-2 top-1/2 z-10 h-12 -translate-y-1/2 rounded-xl border border-acc/40 bg-acc/10" />
+        <div className="relative grid grid-cols-2 gap-2 overflow-hidden rounded-2xl border border-line bg-panel2/60 p-1.5">
+          <div className="pointer-events-none absolute inset-x-2 top-1/2 z-10 h-10 -translate-y-1/2 rounded-xl border border-acc/40 bg-acc/10" />
           <Wheel label="Часы" values={hours} value={selectedHour} onChange={setSelectedHour} scrollRef={hourRef} />
           <Wheel label="Минуты" values={minutes} value={selectedMinute} onChange={setSelectedMinute} scrollRef={minuteRef} />
         </div>
       </div>
       <Btn
+        size="sm"
         className="w-full"
         onClick={() => onChange(`${String(selectedHour).padStart(2, "0")}:${String(selectedMinute).padStart(2, "0")}`, mealName.trim())}
       >
@@ -847,22 +859,22 @@ function Wheel({
 }) {
   return (
     <div className="relative z-20 min-w-0">
-      <div className="mb-1 text-center text-[10px] font-bold tracking-[.14em] text-mute uppercase">{label}</div>
+      <div className="mb-0.5 text-center text-[9px] font-bold tracking-[.14em] text-mute uppercase">{label}</div>
       <div
         ref={scrollRef}
         onScroll={(event) => {
           const box = event.currentTarget;
-          const index = Math.max(0, Math.min(values.length - 1, Math.round((box.scrollTop + box.clientHeight / 2 - 104) / 48)));
+          const index = Math.max(0, Math.min(values.length - 1, Math.round((box.scrollTop + box.clientHeight / 2 - 80) / 40)));
           if (values[index] !== value) onChange(values[index]);
         }}
-        className="h-52 touch-pan-y snap-y snap-mandatory select-none overflow-y-auto overscroll-contain py-20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="h-40 touch-pan-y snap-y snap-mandatory select-none overflow-y-auto overscroll-contain py-15 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {values.map((item) => (
           <button
             type="button"
             key={item}
             onClick={() => onChange(item)}
-            className={`flex h-12 w-full snap-center items-center justify-center rounded-xl font-mono text-xl transition ${item === value ? "font-extrabold text-acc" : "text-mute/70"}`}
+            className={`flex h-10 w-full snap-center items-center justify-center rounded-xl font-mono text-lg transition ${item === value ? "font-extrabold text-acc" : "text-mute/70"}`}
           >
             {String(item).padStart(2, "0")}
           </button>
@@ -875,19 +887,61 @@ function Wheel({
 function NewMealForm({ onCreate }: { onCreate: (title: string, time: string) => void }) {
   const [title, setTitle] = useState("");
   const [time, setTime] = useState(nowTime());
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [h, m] = time.split(":").map(Number);
+  const [hour, setHour] = useState(Number.isFinite(h) ? h : 12);
+  const [minute, setMinute] = useState(Number.isFinite(m) ? m : 0);
+  const hourRef = useRef<HTMLDivElement>(null);
+  const minuteRef = useRef<HTMLDivElement>(null);
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+  const minutes = Array.from({ length: 12 }, (_, i) => i * 5);
+
+  useEffect(() => {
+    setTime(`${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`);
+  }, [hour, minute]);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    hourRef.current?.children[hour]?.scrollIntoView({ block: "center", behavior: "instant" as ScrollBehavior });
+    minuteRef.current?.children[Math.round(minute / 5)]?.scrollIntoView({ block: "center", behavior: "instant" as ScrollBehavior });
+  }, [pickerOpen]);
+
   return (
     <div className="space-y-3">
-      <div className="rounded-xl bg-panel2/60 px-3 py-2 text-xs leading-relaxed text-mute">
-        Название необязательно. Если оставить поле пустым, карточка останется без названия. Время можно изменить позже.
-      </div>
       <Field label="Название (необязательно)">
-        <input className="field" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Например, После тренировки" />
+        <input className="field" {...noSuggest} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Например, После тренировки" />
       </Field>
+
       <Field label="Время приёма">
-        <input type="time" className="field" value={time} onChange={(e) => setTime(e.target.value)} />
+        <button
+          type="button"
+          onClick={() => setPickerOpen((open) => !open)}
+          aria-expanded={pickerOpen}
+          className={`field flex w-full items-center justify-between gap-2 text-left transition ${
+            pickerOpen ? "border-acc2 ring-2 ring-acc2/25" : ""
+          }`}
+        >
+          <span className="font-mono text-lg font-semibold tracking-wide">{time}</span>
+          <span className="flex shrink-0 items-center gap-2 text-mute">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+              <circle cx="12" cy="12" r="8.5" />
+              <path d="M12 7.5V12l3 1.8" />
+            </svg>
+            <span className={`text-xs transition ${pickerOpen ? "rotate-180" : ""}`}>▾</span>
+          </span>
+        </button>
       </Field>
+
+      {pickerOpen && (
+        <div className="rise relative grid w-full grid-cols-2 gap-2 overflow-hidden rounded-2xl border border-line bg-panel2/60 p-1.5">
+          <div className="pointer-events-none absolute inset-x-2 top-1/2 z-10 h-10 -translate-y-1/2 rounded-xl border border-acc/40 bg-acc/15" />
+          <Wheel label="Часы" values={hours} value={hour} onChange={setHour} scrollRef={hourRef} />
+          <Wheel label="Минуты" values={minutes} value={minute} onChange={setMinute} scrollRef={minuteRef} />
+        </div>
+      )}
+
       <Btn className="w-full" disabled={!time} onClick={() => onCreate(title.trim(), time)}>
-        Добавить
+        Добавить приём на {time}
       </Btn>
     </div>
   );
