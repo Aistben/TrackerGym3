@@ -26,15 +26,16 @@ export default function DayView({
   const [addMode, setAddMode] = useState<"search" | "scan" | "photo">("search");
   const [scanPick, setScanPick] = useState(false);
   const [newMeal, setNewMeal] = useState(false);
-  const [moveMeal, setMoveMeal] = useState<Meal | null>(null);
-  const [editMeal, setEditMeal] = useState<Meal | null>(null);
   const [timePick, setTimePick] = useState<Meal | null>(null);
   const [editEntry, setEditEntry] = useState<EntryAction | null>(null);
   const [moveEntry, setMoveEntry] = useState<EntryAction | null>(null);
   const [deleteMeal, setDeleteMeal] = useState<Meal | null>(null);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ mealId: string; entryId: string; grams: number } | null>(null);
   const [tempMealId, setTempMealId] = useState<string | null>(null);
-  const dateInputRef = useRef<HTMLInputElement>(null);
   const lastPhotoRequest = useRef(0);
+  const noticeTimer = useRef<number | null>(null);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const holdTimer = useRef<number | null>(null);
   const longPressTriggered = useRef(false);
@@ -43,21 +44,40 @@ export default function DayView({
     () => state.meals.filter((m) => m.date === date).sort((a, b) => a.time.localeCompare(b.time)),
     [state.meals, date],
   );
-  const totals = dayTotals(meals);
+  const visibleMeals = useMemo(() => {
+    if (!preview) return meals;
+    return meals.map((meal) =>
+      meal.id === preview.mealId
+        ? { ...meal, entries: meal.entries.map((entry) => (entry.id === preview.entryId ? { ...entry, grams: preview.grams } : entry)) }
+        : meal,
+    );
+  }, [meals, preview]);
+  const totals = dayTotals(visibleMeals);
   const left = Math.max(0, targets.calories - totals.kcal);
   const hasOverlay = !!(
     addTo ||
     scanPick ||
     newMeal ||
-    moveMeal ||
-    editMeal ||
     timePick ||
     editEntry ||
     moveEntry ||
-    deleteMeal
+    deleteMeal ||
+    calendarOpen
   );
 
   const update = (fn: (ms: Meal[]) => Meal[]) => setState((s) => ({ ...s, meals: fn(s.meals) }));
+
+  function notify(message: string) {
+    if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current);
+    setNotice(message);
+    noticeTimer.current = window.setTimeout(() => setNotice(null), 2200);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!photoRequest || photoRequest === lastPhotoRequest.current) return;
@@ -66,7 +86,7 @@ export default function DayView({
   }, [photoRequest]);
 
   function addMeal(title: string, time: string): Meal {
-    const meal = { id: uid(), date, title: title.trim() || "Приём", time, entries: [] };
+    const meal = { id: uid(), date, title: title.trim(), time, entries: [] };
     update((ms) => [...ms, meal]);
     return meal;
   }
@@ -78,7 +98,7 @@ export default function DayView({
       setTempMealId(null);
       setAddTo(target);
     } else {
-      const meal = addMeal("Приём", nowTime());
+      const meal = addMeal("", nowTime());
       setTempMealId(meal.id);
       setAddTo(meal);
     }
@@ -135,6 +155,8 @@ export default function DayView({
       };
     });
     setMoveEntry(null);
+    const targetMeal = meals.find((meal) => meal.id === targetMealId);
+    notify(`Продукт перенесён в ${targetMeal ? mealTitle(targetMeal.title) : "другой приём"}`);
   }
 
   function copyMeal(meal: Meal, targetDate: string, mode: "copy" | "move") {
@@ -148,14 +170,17 @@ export default function DayView({
       const rest = mode === "move" ? ms.filter((m) => m.id !== meal.id) : ms;
       return [...rest, clone];
     });
+    notify(
+      mode === "move"
+        ? `Приём перенесён на ${humanDate(targetDate).toLowerCase()}`
+        : targetDate === meal.date
+          ? "Приём продублирован"
+          : `Копия сохранена на ${humanDate(targetDate).toLowerCase()}`,
+    );
   }
 
-  function openPicker() {
-    const el = dateInputRef.current;
-    if (!el) return;
-    const picker = el as HTMLInputElement & { showPicker?: () => void };
-    if (typeof picker.showPicker === "function") picker.showPicker();
-    else el.click();
+  function openCalendar() {
+    setCalendarOpen(true);
   }
 
   function handleTouchStart(event: React.TouchEvent<HTMLDivElement>) {
@@ -209,21 +234,12 @@ export default function DayView({
         <div
           role="button"
           tabIndex={0}
-          onClick={openPicker}
-          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && openPicker()}
+          onClick={openCalendar}
+          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && openCalendar()}
           className="card relative flex-1 cursor-pointer py-2.5 text-center transition active:scale-[0.99]"
         >
           <div className="truncate text-sm font-semibold">{humanDate(date)}</div>
-          <div className="truncate text-[11px] text-mute">{date.split("-").reverse().join(".")}</div>
-          <input
-            ref={dateInputRef}
-            type="date"
-            value={date}
-            onChange={(e) => e.target.value && setDate(e.target.value)}
-            className="pointer-events-none absolute inset-0 opacity-0"
-            tabIndex={-1}
-            aria-hidden
-          />
+          <div className="truncate text-[11px] text-mute">{date.split("-").reverse().join(".")} · календарь</div>
         </div>
         <IconBtn onClick={() => setDate(shiftDate(date, 1))} title="Следующий день" size={40}>
           ›
@@ -259,7 +275,7 @@ export default function DayView({
         </div>
       </div>
 
-      {meals.map((meal) => {
+      {visibleMeals.map((meal) => {
         const t = sumTotals(meal.entries);
         return (
           <div key={meal.id} className="card rise overflow-hidden">
@@ -273,7 +289,7 @@ export default function DayView({
                 {meal.time}
               </button>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold">{meal.title || "Приём"}</div>
+                <div className="truncate text-sm font-semibold">{mealTitle(meal.title)}</div>
                 <div className="truncate text-[11px] text-mute">
                   {round(t.kcal)} ккал · Б {round(t.protein)} · Ж {round(t.fat)} · У {round(t.carbs)}
                 </div>
@@ -284,7 +300,7 @@ export default function DayView({
               <IconBtn onClick={() => copyMeal(meal, date, "copy")} title="Дублировать приём" size={32}>
                 <span className="text-lg leading-none">↗</span>
               </IconBtn>
-              <IconBtn onClick={() => setMoveMeal(meal)} title="Изменить приём" size={32}>
+              <IconBtn onClick={() => setTimePick(meal)} title="Изменить время приёма" size={32}>
                 <span className="text-sm">✎</span>
               </IconBtn>
               <IconBtn
@@ -300,7 +316,7 @@ export default function DayView({
             <div className="divide-y divide-line">
               {meal.entries.map((entry) => {
                 const totalsForEntry = entryTotals(entry);
-                const action = { mealId: meal.id, mealTitle: meal.title || "Приём", entry };
+                const action = { mealId: meal.id, mealTitle: mealTitle(meal.title), entry };
                 return (
                   <div key={entry.id} className="flex items-center gap-2 px-3 py-2">
                     <button
@@ -359,7 +375,7 @@ export default function DayView({
         ▣ Сканировать штрихкод
       </Btn>
 
-      <Sheet open={scanPick} onClose={() => setScanPick(false)} title="Сканировать штрихкод">
+      <Sheet open={scanPick} onClose={() => setScanPick(false)} title="Сканировать штрихкод" center>
         <div className="space-y-3">
           <p className="text-sm text-mute">Куда добавить найденный продукт?</p>
           {meals.map((meal) => (
@@ -372,7 +388,7 @@ export default function DayView({
               <span className="shrink-0 rounded-lg bg-panel px-2 py-1 font-mono text-xs whitespace-nowrap text-acc2">
                 {meal.time}
               </span>
-              <span className="min-w-0 flex-1 truncate text-sm font-medium">{meal.title || "Приём"}</span>
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">{mealTitle(meal.title)}</span>
               <span className="shrink-0 text-xs text-mute">{meal.entries.length} поз.</span>
             </button>
           ))}
@@ -380,7 +396,7 @@ export default function DayView({
             variant="soft"
             className="w-full"
             onClick={() => {
-              const meal = addMeal("Приём", nowTime());
+              const meal = addMeal("", nowTime());
               setTempMealId(meal.id);
               setAddMode("scan");
               setAddTo(meal);
@@ -392,13 +408,13 @@ export default function DayView({
         </div>
       </Sheet>
 
-      <Sheet open={!!addTo} onClose={closeAddFood} title={`${addTo?.time} · ${addTo?.title || "Приём"}`} full>
+      <Sheet open={!!addTo} onClose={closeAddFood} title={`${addTo?.time} · ${mealTitle(addTo?.title ?? "")}`} full>
         {addTo && (
           <AddFood
             key={addTo.id + addMode}
             products={state.products}
             recentProductIds={state.recentProductIds}
-            mealTitle={addTo.title || "Приём"}
+            mealTitle={mealTitle(addTo.title)}
             startMode={addMode}
             onSaveProduct={(p: Product) =>
               setState((s) => ({ ...s, products: [p, ...s.products.filter((x) => x.id !== p.id)] }))
@@ -415,80 +431,71 @@ export default function DayView({
             }
             onAdd={(entry) => addEntry(addTo.id, entry)}
             onClose={closeAddFood}
+            onNotice={notify}
           />
         )}
       </Sheet>
 
-      <Sheet open={newMeal} onClose={() => setNewMeal(false)} title="Новый приём пищи">
+      <Sheet open={newMeal} onClose={() => setNewMeal(false)} title="Новый приём пищи" center>
         <NewMealForm
           onCreate={(title, time) => {
             addMeal(title, time);
             setNewMeal(false);
+            notify("Новый приём добавлен");
           }}
         />
       </Sheet>
 
-      <Sheet open={!!moveMeal} onClose={() => setMoveMeal(null)} title={moveMeal ? `«${moveMeal.title || "Приём"}»` : ""}>
-        {moveMeal && (
-          <MealMenu
-            onEdit={() => {
-              setEditMeal(moveMeal);
-              setMoveMeal(null);
-            }}
-          />
-        )}
-      </Sheet>
-
-      <Sheet open={!!timePick} onClose={() => setTimePick(null)} title={timePick ? `Время · ${timePick.title || "Приём"}` : "Время"}>
+      <Sheet open={!!timePick} onClose={() => setTimePick(null)} title={timePick ? `Время · ${mealTitle(timePick.title)}` : "Время"} center>
         {timePick && (
           <TimePicker
             value={timePick.time}
-            onChange={(time) => {
-              update((ms) => ms.map((m) => (m.id === timePick.id ? { ...m, time } : m)));
+            title={timePick.title}
+            onChange={(time, title) => {
+              update((ms) => ms.map((m) => (m.id === timePick.id ? { ...m, title, time } : m)));
               setTimePick(null);
-            }}
-            onCustom={() => {
-              setEditMeal(timePick);
-              setTimePick(null);
+              notify("Приём изменён");
             }}
           />
         )}
       </Sheet>
 
-      <Sheet open={!!editMeal} onClose={() => setEditMeal(null)} title="Изменить приём пищи">
-        {editMeal && (
-          <NewMealForm
-            initial={editMeal}
-            submitLabel="Сохранить"
-            onCreate={(title, time) => {
-              update((ms) => ms.map((m) => (m.id === editMeal.id ? { ...m, title, time } : m)));
-              setEditMeal(null);
-            }}
-          />
-        )}
-      </Sheet>
-
-      <Sheet open={!!editEntry} onClose={() => setEditEntry(null)} title={editEntry?.entry.name || "Продукт"}>
+      <Sheet
+        open={!!editEntry}
+        onClose={() => {
+          setPreview(null);
+          setEditEntry(null);
+        }}
+        title={editEntry?.entry.name || "Продукт"}
+        center
+        noBackdrop
+      >
         {editEntry && (
           <EntryEditor
             action={editEntry}
+            onPreview={(grams) => setPreview({ mealId: editEntry.mealId, entryId: editEntry.entry.id, grams })}
             onSave={(grams) => {
               updateEntry(editEntry.mealId, editEntry.entry.id, grams);
+              setPreview(null);
               setEditEntry(null);
+              notify("Количество продукта изменено");
             }}
             onMove={() => {
+              setPreview(null);
               setMoveEntry(editEntry);
               setEditEntry(null);
             }}
             onDelete={() => {
               removeEntry(editEntry.mealId, editEntry.entry.id);
+              setPreview(null);
               setEditEntry(null);
+              notify("Продукт удалён");
             }}
           />
         )}
       </Sheet>
 
-      <Sheet open={!!moveEntry} onClose={() => setMoveEntry(null)} title="Перенести продукт">
+      <Sheet open={!!moveEntry} onClose={() => setMoveEntry(null)} title="Перенести продукт" center>
         {moveEntry && (
           <EntryMoveSheet
             action={moveEntry}
@@ -498,11 +505,11 @@ export default function DayView({
         )}
       </Sheet>
 
-      <Sheet open={!!deleteMeal} onClose={() => setDeleteMeal(null)} title="Удалить приём?">
+      <Sheet open={!!deleteMeal} onClose={() => setDeleteMeal(null)} title="Удалить приём?" center>
         {deleteMeal && (
           <div className="space-y-4">
             <p className="text-sm leading-relaxed text-mute">
-              Удалить «{deleteMeal.title || "Приём"}» вместе со всеми продуктами? Это действие нельзя отменить.
+              Удалить «{mealTitle(deleteMeal.title)}» вместе со всеми продуктами? Это действие нельзя отменить.
             </p>
             <div className="grid grid-cols-2 gap-2">
               <Btn variant="soft" onClick={() => setDeleteMeal(null)}>
@@ -513,6 +520,7 @@ export default function DayView({
                 onClick={() => {
                   update((ms) => ms.filter((meal) => meal.id !== deleteMeal.id));
                   setDeleteMeal(null);
+                  notify("Приём удалён");
                 }}
               >
                 Да, удалить
@@ -521,6 +529,20 @@ export default function DayView({
           </div>
         )}
       </Sheet>
+
+      <Sheet open={calendarOpen} onClose={() => setCalendarOpen(false)} title="Календарь питания" center>
+        <CalendarView
+          state={state}
+          targets={targets}
+          selectedDate={date}
+          onSelect={(selectedDate) => {
+            setDate(selectedDate);
+            setCalendarOpen(false);
+          }}
+        />
+      </Sheet>
+
+      {notice && <CenterNotice message={notice} />}
     </div>
   );
 }
@@ -541,17 +563,25 @@ function MacroLine({ label, value, max, color }: { label: string; value: number;
 
 function EntryEditor({
   action,
+  onPreview,
   onSave,
   onMove,
   onDelete,
 }: {
   action: EntryAction;
+  onPreview: (grams: number) => void;
   onSave: (grams: number) => void;
   onMove: () => void;
   onDelete: () => void;
 }) {
   const [grams, setGrams] = useState(String(action.entry.grams));
   const value = Math.max(0, Number(grams.replace(",", ".")) || 0);
+  const changeGrams = (next: number | string) => {
+    const text = String(next).replace(",", ".");
+    const numeric = Math.max(0, Number(text) || 0);
+    setGrams(text);
+    onPreview(numeric);
+  };
   const total = entryTotals({ ...action.entry, grams: value });
   const quickValues = [30, 50, 100, 150, 200, 250, 300];
 
@@ -563,7 +593,7 @@ function EntryEditor({
       </div>
       <Field label="Количество, г / мл">
         <div className="flex items-center gap-2">
-          <IconBtn onClick={() => setGrams(String(Math.max(0, value - 10)))} title="Уменьшить на 10 г" size={44}>
+          <IconBtn onClick={() => changeGrams(Math.max(0, value - 10))} title="Уменьшить на 10 г" size={44}>
             −
           </IconBtn>
           <input
@@ -571,9 +601,9 @@ function EntryEditor({
             inputMode="decimal"
             autoFocus
             value={grams}
-            onChange={(event) => setGrams(event.target.value.replace(",", "."))}
+            onChange={(event) => changeGrams(event.target.value)}
           />
-          <IconBtn onClick={() => setGrams(String(value + 10))} title="Увеличить на 10 г" size={44}>
+          <IconBtn onClick={() => changeGrams(value + 10)} title="Увеличить на 10 г" size={44}>
             +
           </IconBtn>
         </div>
@@ -583,7 +613,7 @@ function EntryEditor({
           <button
             type="button"
             key={quick}
-            onClick={() => setGrams(String(quick))}
+            onClick={() => changeGrams(quick)}
             className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
               value === quick ? "border-acc bg-acc/15 text-acc" : "border-line bg-panel2 hover:border-acc2/60"
             }`}
@@ -644,7 +674,7 @@ function EntryMoveSheet({
           className="flex w-full items-center gap-3 rounded-xl border border-line bg-panel2 px-3 py-3 text-left transition hover:border-acc/60"
         >
           <span className="font-mono text-xs text-acc2">{meal.time}</span>
-          <span className="min-w-0 flex-1 truncate font-medium">{meal.title || "Приём"}</span>
+          <span className="min-w-0 flex-1 truncate font-medium">{mealTitle(meal.title)}</span>
           <span className="text-lg text-acc">→</span>
         </button>
       ))}
@@ -652,15 +682,115 @@ function EntryMoveSheet({
   );
 }
 
+function CalendarView({
+  state,
+  targets,
+  selectedDate,
+  onSelect,
+}: {
+  state: AppState;
+  targets: Targets;
+  selectedDate: string;
+  onSelect: (date: string) => void;
+}) {
+  const [month, setMonth] = useState(`${selectedDate.slice(0, 7)}-01`);
+  const first = new Date(`${month}T12:00:00`);
+  const year = first.getFullYear();
+  const monthIndex = first.getMonth();
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const leading = (first.getDay() + 6) % 7;
+  const monthLabel = first.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+  const totals = useMemo(() => {
+    const result = new Map<string, ReturnType<typeof sumTotals>>();
+    for (const meal of state.meals) {
+      if (!meal.entries.length) continue;
+      const previous = result.get(meal.date) ?? { kcal: 0, protein: 0, fat: 0, carbs: 0 };
+      const current = sumTotals(meal.entries);
+      result.set(meal.date, {
+        kcal: previous.kcal + current.kcal,
+        protein: previous.protein + current.protein,
+        fat: previous.fat + current.fat,
+        carbs: previous.carbs + current.carbs,
+      });
+    }
+    return result;
+  }, [state.meals]);
+
+  function moveMonth(delta: number) {
+    const next = new Date(year, monthIndex + delta, 1, 12);
+    setMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-01`);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <IconBtn onClick={() => moveMonth(-1)} title="Предыдущий месяц" size={36}>‹</IconBtn>
+        <div className="text-center font-semibold capitalize">{monthLabel}</div>
+        <IconBtn onClick={() => moveMonth(1)} title="Следующий месяц" size={36}>›</IconBtn>
+      </div>
+      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-semibold text-mute">
+        {["пн", "вт", "ср", "чт", "пт", "сб", "вс"].map((day) => <div key={day}>{day}</div>)}
+      </div>
+      <div className="grid grid-cols-7 gap-1.5">
+        {Array.from({ length: leading }, (_, index) => <div key={`empty-${index}`} className="aspect-square" />)}
+        {Array.from({ length: daysInMonth }, (_, index) => {
+          const day = index + 1;
+          const dayDate = `${month.slice(0, 7)}-${String(day).padStart(2, "0")}`;
+          const dayTotals = totals.get(dayDate);
+          const kcal = Math.round(dayTotals?.kcal ?? 0);
+          const hasEntries = !!dayTotals;
+          const complete = hasEntries && isTargetValue(dayTotals.kcal, targets.calories) && isTargetValue(dayTotals.protein, targets.protein) && isTargetValue(dayTotals.fat, targets.fat) && isTargetValue(dayTotals.carbs, targets.carbs);
+          return (
+            <button
+              type="button"
+              key={dayDate}
+              onClick={() => onSelect(dayDate)}
+              className={`flex aspect-square min-w-0 flex-col items-center justify-center rounded-xl border text-xs transition active:scale-95 ${
+                dayDate === selectedDate
+                  ? "border-acc bg-acc/15"
+                  : complete
+                    ? "border-acc2/50 bg-acc2/18"
+                    : hasEntries
+                      ? "border-bad/40 bg-bad/10"
+                      : "border-line bg-panel2/45"
+              }`}
+            >
+              <span className="font-semibold">{day}</span>
+              {hasEntries && <span className={`mt-0.5 truncate text-[9px] ${complete ? "text-acc2" : "text-bad"}`}>{kcal}</span>}
+            </button>
+          );
+        })}
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-[10px] text-mute">
+        <div className="rounded-lg bg-acc2/12 px-2 py-1.5 text-center"><span className="text-acc2">●</span> цель выполнена</div>
+        <div className="rounded-lg bg-bad/10 px-2 py-1.5 text-center"><span className="text-bad">●</span> ниже или выше нормы</div>
+        <div className="rounded-lg bg-panel2/55 px-2 py-1.5 text-center"><span>●</span> нет записей</div>
+      </div>
+      <p className="text-center text-[11px] text-mute">Зелёный день — калории и все БЖУ в пределах ±10% от цели.</p>
+    </div>
+  );
+}
+
+function CenterNotice({ message }: { message: string }) {
+  return (
+    <div className="pointer-events-none fixed inset-0 z-[70] grid place-items-center p-4">
+      <div className="rounded-2xl border border-acc2/40 bg-panel px-5 py-3 text-center text-sm font-semibold text-ink shadow-2xl shadow-black/15 backdrop-blur-xl">
+        ✓ {message}
+      </div>
+    </div>
+  );
+}
+
 function TimePicker({
   value,
+  title,
   onChange,
-  onCustom,
 }: {
   value: string;
-  onChange: (time: string) => void;
-  onCustom: () => void;
+  title?: string;
+  onChange: (time: string, title: string) => void;
 }) {
+  const [mealName, setMealName] = useState(title && title !== "Приём" ? title : "");
   const [hourValue, minuteValue] = value.split(":").map(Number);
   const [selectedHour, setSelectedHour] = useState(Number.isFinite(hourValue) ? hourValue : 12);
   const [selectedMinute, setSelectedMinute] = useState(Number.isFinite(minuteValue) ? minuteValue : 0);
@@ -679,6 +809,14 @@ function TimePicker({
 
   return (
     <div className="space-y-4">
+      <Field label="Название (необязательно)">
+        <input
+          className="field"
+          value={mealName}
+          onChange={(event) => setMealName(event.target.value)}
+          placeholder="Оставьте пустым — будет «—»"
+        />
+      </Field>
       <div>
         <p className="text-sm text-mute">Проведи пальцем по часам и минутам — выбранное значение будет в центре.</p>
         <div className="relative mt-4 grid grid-cols-2 gap-3 overflow-hidden rounded-2xl border border-line bg-panel2/60 p-2">
@@ -687,10 +825,12 @@ function TimePicker({
           <Wheel label="Минуты" values={minutes} value={selectedMinute} onChange={setSelectedMinute} scrollRef={minuteRef} />
         </div>
       </div>
-      <Btn className="w-full" onClick={() => onChange(`${String(selectedHour).padStart(2, "0")}:${String(selectedMinute).padStart(2, "0")}`)}>
-        Выбрать {String(selectedHour).padStart(2, "0")}:{String(selectedMinute).padStart(2, "0")}
+      <Btn
+        className="w-full"
+        onClick={() => onChange(`${String(selectedHour).padStart(2, "0")}:${String(selectedMinute).padStart(2, "0")}`, mealName.trim())}
+      >
+        Сохранить {String(selectedHour).padStart(2, "0")}:{String(selectedMinute).padStart(2, "0")}
       </Btn>
-      <Btn variant="soft" className="w-full" onClick={onCustom}>Ввести точное время с клавиатуры</Btn>
     </div>
   );
 }
@@ -749,7 +889,7 @@ function NewMealForm({
   return (
     <div className="space-y-3">
       <div className="rounded-xl bg-panel2/60 px-3 py-2 text-xs leading-relaxed text-mute">
-        Название необязательно — если оставить поле пустым, приём будет называться «Приём». Время можно изменить позже.
+        Название необязательно — если оставить поле пустым, в карточке будет стоять прочерк «—». Время можно изменить позже.
       </div>
       <Field label="Название (необязательно)">
         <input className="field" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Например, После тренировки" />
@@ -757,22 +897,20 @@ function NewMealForm({
       <Field label="Время приёма">
         <input type="time" className="field" value={time} onChange={(e) => setTime(e.target.value)} />
       </Field>
-      <Btn className="w-full" disabled={!time} onClick={() => onCreate(title.trim() || "Приём", time)}>
+      <Btn className="w-full" disabled={!time} onClick={() => onCreate(title.trim(), time)}>
         {submitLabel}
       </Btn>
     </div>
   );
 }
 
-function MealMenu({ onEdit }: { onEdit: () => void }) {
-  return (
-    <div className="space-y-3">
-      <p className="text-sm leading-relaxed text-mute">Измените название или время приёма пищи.</p>
-      <Btn variant="soft" className="w-full" onClick={onEdit}>
-        ✏️ Название / время
-      </Btn>
-    </div>
-  );
+function isTargetValue(value: number, target: number) {
+  return target > 0 && value >= target * 0.9 && value <= target * 1.1;
+}
+
+function mealTitle(title?: string) {
+  const value = title?.trim() ?? "";
+  return !value || value === "Приём" ? "—" : value;
 }
 
 function nowTime() {

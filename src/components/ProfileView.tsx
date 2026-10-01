@@ -219,7 +219,7 @@ export default function ProfileView({
         </Btn>
       </div>
 
-      <Sheet open={resetOpen} onClose={() => setResetOpen(false)} title="Сбросить все данные?">
+      <Sheet open={resetOpen} onClose={() => setResetOpen(false)} title="Сбросить все данные?" center>
         <div className="space-y-4">
           <p className="text-sm leading-relaxed text-mute">
             Профиль, дневник, продукты и история веса будут удалены. Это действие нельзя отменить.

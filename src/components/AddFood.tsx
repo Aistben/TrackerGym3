@@ -23,6 +23,7 @@ export default function AddFood({
   onUsed,
   onAdd,
   onClose,
+  onNotice,
 }: {
   products: Product[];
   recentProductIds: string[];
@@ -33,6 +34,7 @@ export default function AddFood({
   onUsed: (id: string) => void;
   onAdd: (entry: MealEntry) => void;
   onClose: () => void;
+  onNotice?: (message: string) => void;
 }) {
   const [mode, setMode] = useState<Mode>(startMode);
   const [lib, setLib] = useState<Lib>(recentProductIds.length ? "recent" : "base");
@@ -210,6 +212,7 @@ export default function AddFood({
       fat: picked.fat,
       carbs: picked.carbs,
     });
+    onNotice?.(`${picked.name} добавлен в дневник`);
     onClose();
   }
 

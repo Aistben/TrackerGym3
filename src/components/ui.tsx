@@ -6,12 +6,16 @@ export function Sheet({
   title,
   children,
   full,
+  center = false,
+  noBackdrop = false,
 }: {
   open: boolean;
   onClose: () => void;
   title: ReactNode;
   children: ReactNode;
   full?: boolean;
+  center?: boolean;
+  noBackdrop?: boolean;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -26,14 +30,14 @@ export function Sheet({
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+    <div className={`fixed inset-0 z-50 flex justify-center ${center ? "items-center p-4" : "items-end sm:items-center"}`}>
+      {!noBackdrop && <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />}
       <div
-        className={`sheet-in relative w-full max-w-lg overflow-hidden rounded-t-3xl border border-line bg-panel shadow-2xl shadow-black/40 sm:rounded-3xl ${
-          full ? "h-[92vh] sm:h-[80vh]" : "max-h-[90vh]"
-        } flex flex-col`}
+        className={`sheet-in relative w-full max-w-lg overflow-hidden border border-line bg-panel shadow-2xl shadow-black/40 ${
+          center ? "max-h-[88vh] rounded-3xl" : "rounded-t-3xl sm:rounded-3xl"
+        } ${full ? "h-[92vh] sm:h-[80vh]" : "max-h-[90vh]"} flex flex-col`}
       >
-        <div className="flex shrink-0 flex-col pt-2 sm:hidden">
+        <div className={`${center ? "hidden" : "flex"} shrink-0 flex-col pt-2 sm:hidden`}>
           <div className="mx-auto h-1.5 w-10 rounded-full bg-line" />
         </div>
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-3">
