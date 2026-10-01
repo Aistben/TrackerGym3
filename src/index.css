@@ -1,13 +1,13 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink: #070a12;
-  --color-panel: #0e1422;
-  --color-panel2: #151d30;
-  --color-line: #1f2a42;
-  --color-mute: #8394b4;
-  --color-acc: #4ade80;
-  --color-acc2: #38bdf8;
+  --color-ink: #111827;
+  --color-panel: #1c2738;
+  --color-panel2: #263449;
+  --color-line: #3a4960;
+  --color-mute: #a9b8cd;
+  --color-acc: #6ee7a0;
+  --color-acc2: #67d4ff;
   --color-warn: #fbbf24;
   --color-bad: #f87171;
 }
@@ -20,15 +20,47 @@ body,
 
 body {
   margin: 0;
-  background: var(--color-ink);
-  color: #e8eefc;
+  background:
+    radial-gradient(circle at 15% -10%, rgba(103, 212, 255, 0.13), transparent 32rem),
+    radial-gradient(circle at 100% 15%, rgba(110, 231, 160, 0.09), transparent 28rem),
+    var(--color-ink);
+  background-attachment: fixed;
+  color: #f4f7fb;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
 }
 
 * {
+  box-sizing: border-box;
+  min-width: 0;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Длинные названия, штрихкоды и подписи не должны расширять экран. */
+p,
+span,
+div,
+button,
+label {
+  overflow-wrap: anywhere;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+@media (max-width: 359px) {
+  .field {
+    padding-inline: 0.6rem;
+  }
 }
 
 input,
@@ -55,9 +87,10 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 @utility card {
-  background: var(--color-panel);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--color-panel) 96%, white), var(--color-panel));
   border: 1px solid var(--color-line);
   border-radius: 1rem;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.14);
 }
 
 @utility field {

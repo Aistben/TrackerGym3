@@ -3,8 +3,10 @@ import type { MealEntry, Product } from "../lib/types";
 import { round } from "../lib/nutrition";
 import { uid } from "../lib/storage";
 import { lookupBarcode, searchOnline } from "../lib/openfoodfacts";
+import { sameBarcode } from "../lib/barcode";
 import { Btn, Empty, Field } from "./ui";
 import Scanner from "./Scanner";
+import LabelScanner from "./LabelScanner";
 
 type Mode = "search" | "scan" | "create" | "portion";
 
@@ -55,7 +57,7 @@ export default function AddFood({
       setLoading(true);
       try {
         const res = await searchOnline(s, ac.signal);
-        setOnline(res.filter((p) => !products.some((lp) => lp.barcode && lp.barcode === p.barcode)));
+        setOnline(res.filter((p) => !products.some((lp) => sameBarcode(lp.barcode, p.barcode))));
       } catch {
         /* offline — ничего страшного */
       } finally {
@@ -74,7 +76,7 @@ export default function AddFood({
 
   async function handleCode(code: string) {
     setMode("search");
-    const known = products.find((p) => p.barcode === code);
+    const known = products.find((p) => sameBarcode(p.barcode, code));
     if (known) {
       setNotice(null);
       pick(known);
@@ -227,6 +229,7 @@ export default function AddFood({
             />
           </Field>
         </div>
+        <LabelScanner onRead={(values) => setDraft((current) => ({ ...current, ...values }))} />
         <div className="text-xs text-mute">Пищевая ценность на 100 г / 100 мл</div>
         <div className="grid grid-cols-2 gap-3">
           {(

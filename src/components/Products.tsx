@@ -2,8 +2,10 @@ import { useMemo, useState } from "react";
 import type { AppState, Product } from "../lib/types";
 import { uid } from "../lib/storage";
 import { lookupBarcode } from "../lib/openfoodfacts";
+import { sameBarcode } from "../lib/barcode";
 import { Btn, Empty, Field, Sheet } from "./ui";
 import Scanner from "./Scanner";
+import LabelScanner from "./LabelScanner";
 
 const blank = { name: "", brand: "", barcode: "", kcal: "", protein: "", fat: "", carbs: "", portion: "" };
 
@@ -69,7 +71,7 @@ export default function Products({
 
   async function onCode(code: string) {
     setScan(false);
-    const known = state.products.find((p) => p.barcode === code);
+    const known = state.products.find((p) => sameBarcode(p.barcode, code));
     if (known) {
       setMsg(null);
       setQ(code);
@@ -98,7 +100,7 @@ export default function Products({
         </button>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {(
           [
             ["all", `Все · ${state.products.length}`],
@@ -170,6 +172,7 @@ export default function Products({
               />
             </Field>
           </div>
+          <LabelScanner onRead={(values) => setForm((current) => ({ ...current, ...values }))} />
           <div className="text-xs text-mute">На 100 г / 100 мл</div>
           <div className="grid grid-cols-2 gap-3">
             {(

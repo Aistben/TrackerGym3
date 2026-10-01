@@ -46,8 +46,8 @@ export default function App() {
 
   return (
     <div className="mx-auto min-h-dvh max-w-lg px-4 pt-5">
-      <header className="mb-4 flex items-center justify-between">
-        <div>
+      <header className="mb-4 flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
           <div className="text-xs tracking-[0.18em] text-mute uppercase">
             {goal.emoji} {goal.label}
           </div>
@@ -55,7 +55,7 @@ export default function App() {
             {TABS.find((t) => t.key === tab)!.label}
           </h1>
         </div>
-        <div className="text-right">
+        <div className="shrink-0 text-right">
           <div className="text-lg font-bold text-acc">{targets.calories}</div>
           <div className="text-[11px] text-mute">ккал в день</div>
         </div>

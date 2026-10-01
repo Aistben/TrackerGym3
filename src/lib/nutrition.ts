@@ -37,10 +37,11 @@ export function computeTargets(profile: Profile, currentWeight: number): Targets
     return { bmr, tdee, calories, ...m };
   }
 
-  // Белок: 1.6–2.2 г/кг в зависимости от цели. Жиры ~25–30% калорий. Остальное — углеводы.
-  const proteinPerKg = profile.goal === "lose" ? 2.2 : profile.goal === "gain" ? 1.8 : 1.8;
+  // Белок: 1.8–2.2 г/кг. Жиры — 30% калорий, остаток приходится на углеводы.
+  // Более высокая доля жиров не завышает углеводы при наборе массы.
+  const proteinPerKg = profile.goal === "lose" ? 2.2 : 1.8;
   const protein = Math.round(weight * proteinPerKg);
-  const fatPct = profile.goal === "lose" ? 0.28 : 0.25;
+  const fatPct = 0.3;
   const fat = Math.round((calories * fatPct) / 9);
   const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
 

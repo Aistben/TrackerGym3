@@ -33,8 +33,8 @@ export function Sheet({
           full ? "h-[92vh] sm:h-[80vh]" : "max-h-[90vh]"
         } flex flex-col`}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
-          <h3 className="text-base font-semibold">{title}</h3>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-3">
+          <h3 className="min-w-0 flex-1 text-base font-semibold leading-snug">{title}</h3>
           <button
             onClick={onClose}
             className="grid size-8 place-items-center rounded-full bg-panel2 text-mute transition hover:text-white"
