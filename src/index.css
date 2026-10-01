@@ -1,153 +1,50 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink: #111827;
-  --color-panel: #1c2738;
-  --color-panel2: #263449;
-  --color-line: #3a4960;
-  --color-mute: #a9b8cd;
-  --color-acc: #6ee7a0;
-  --color-acc2: #67d4ff;
-  --color-warn: #fbbf24;
-  --color-bad: #f87171;
+  --color-ink: #0b1016;
+  --color-panel: #151d28;
+  --color-panel2: #202b39;
+  --color-line: #344252;
+  --color-mute: #9aa9b9;
+  --color-acc: #ffb454;
+  --color-acc2: #72e2d1;
+  --color-warn: #ffcb68;
+  --color-bad: #ff7f86;
 }
 
-html,
-body,
-#root {
-  height: 100%;
-}
-
+html, body, #root { height: 100%; }
 body {
   margin: 0;
-  background:
-    radial-gradient(circle at 15% -10%, rgba(103, 212, 255, 0.13), transparent 32rem),
-    radial-gradient(circle at 100% 15%, rgba(110, 231, 160, 0.09), transparent 28rem),
-    var(--color-ink);
+  background: radial-gradient(circle at 10% -10%, #24384a 0, transparent 31rem), radial-gradient(circle at 100% 20%, #2b2634 0, transparent 28rem), var(--color-ink);
   background-attachment: fixed;
-  color: #f4f7fb;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #f6f8fa;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
 }
-
-* {
-  box-sizing: border-box;
-  min-width: 0;
-  -webkit-tap-highlight-color: transparent;
-}
-
-/* Длинные названия, штрихкоды и подписи не должны расширять экран. */
-p,
-span,
-div,
-button,
-label {
-  overflow-wrap: anywhere;
-}
-
-body {
-  overflow-x: hidden;
-}
-
-img,
-svg,
-video,
-canvas {
-  max-width: 100%;
-}
-
-@media (max-width: 359px) {
-  .field {
-    padding-inline: 0.6rem;
-  }
-}
-
-input,
-select,
-textarea,
-button {
-  font: inherit;
-  color: inherit;
-}
-
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-thumb {
-  background: #23304d;
-  border-radius: 99px;
-}
+* { box-sizing: border-box; min-width: 0; -webkit-tap-highlight-color: transparent; }
+body { overflow-x: hidden; }
+input, select, textarea, button { font: inherit; color: inherit; }
+p, span, div, button, label { overflow-wrap: anywhere; }
+img, svg, video, canvas { max-width: 100%; }
+input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #344252; border-radius: 99px; }
 
 @utility card {
-  background: linear-gradient(145deg, color-mix(in srgb, var(--color-panel) 96%, white), var(--color-panel));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--color-panel) 94%, white), var(--color-panel));
   border: 1px solid var(--color-line);
-  border-radius: 1.25rem;
-  box-shadow:
-    0 14px 32px rgb(0 0 0 / 0.16),
-    inset 0 1px 0 rgb(255 255 255 / 0.04);
+  border-radius: 1.5rem;
+  box-shadow: 0 18px 42px rgb(0 0 0 / .18), inset 0 1px 0 rgb(255 255 255 / .045);
 }
-
 @utility field {
-  width: 100%;
-  background: var(--color-panel2);
-  border: 1px solid var(--color-line);
-  border-radius: 0.85rem;
-  padding: 0.65rem 0.85rem;
-  outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  width: 100%; background: var(--color-panel2); border: 1px solid var(--color-line); border-radius: 1rem;
+  padding: .72rem .9rem; outline: none; transition: border-color .15s, box-shadow .15s;
 }
-
-@utility field-focus {
-  border-color: var(--color-acc2);
-}
-
-.field:focus {
-  border-color: var(--color-acc2);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-acc2) 22%, transparent);
-}
-
-:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--color-acc2) 70%, transparent);
-  outline-offset: 2px;
-}
-
-/* Safe-area отступы для полосы навигации и плавающих кнопок на iOS/Android. */
-.safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.rise {
-  animation: rise 0.22s ease-out both;
-}
-
-@keyframes sheet-in {
-  from {
-    transform: translateY(100%);
-  }
-  to {
-    transform: none;
-  }
-}
-
-.sheet-in {
-  animation: sheet-in 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
+.field:focus { border-color: var(--color-acc2); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-acc2) 20%, transparent); }
+:focus-visible { outline: 2px solid color-mix(in srgb, var(--color-acc2) 70%, transparent); outline-offset: 2px; }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.rise { animation: rise .22s ease-out both; }
+@keyframes sheet-in { from { transform: translateY(100%); } to { transform: none; } }
+.sheet-in { animation: sheet-in .25s cubic-bezier(.22,1,.36,1) both; }

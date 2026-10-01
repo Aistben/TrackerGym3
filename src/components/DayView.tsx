@@ -5,15 +5,6 @@ import { uid } from "../lib/storage";
 import { Bar, Btn, Empty, Field, IconBtn, Ring, Sheet } from "./ui";
 import AddFood from "./AddFood";
 
-const PRESETS = [
-  { title: "Завтрак", time: "08:30" },
-  { title: "Перекус", time: "11:00" },
-  { title: "Обед", time: "13:30" },
-  { title: "Полдник", time: "16:30" },
-  { title: "Ужин", time: "19:00" },
-  { title: "Перед сном", time: "22:00" },
-];
-
 export default function DayView({
   state,
   setState,
@@ -28,7 +19,8 @@ export default function DayView({
   setDate: (d: string) => void;
 }) {
   const [addTo, setAddTo] = useState<Meal | null>(null);
-  const [addMode, setAddMode] = useState<"search" | "scan">("search");
+  const [addMode, setAddMode] = useState<"search" | "scan" | "photo">("search");
+  const [photoFirst, setPhotoFirst] = useState(false);
   const [scanPick, setScanPick] = useState(false);
   const [newMeal, setNewMeal] = useState(false);
   const [moveMeal, setMoveMeal] = useState<Meal | null>(null);
@@ -44,8 +36,10 @@ export default function DayView({
 
   const update = (fn: (ms: Meal[]) => Meal[]) => setState((s) => ({ ...s, meals: fn(s.meals) }));
 
-  function addMeal(title: string, time: string) {
-    update((ms) => [...ms, { id: uid(), date, title, time, entries: [] }]);
+  function addMeal(title: string, time: string): Meal {
+    const meal = { id: uid(), date, title, time, entries: [] };
+    update((ms) => [...ms, meal]);
+    return meal;
   }
 
   function addEntry(mealId: string, e: MealEntry) {
@@ -144,9 +138,13 @@ export default function DayView({
         return (
           <div key={meal.id} className="card rise overflow-hidden">
             <div className="flex items-center gap-2.5 border-b border-line px-4 py-3">
-              <div className="shrink-0 rounded-lg bg-panel2 px-2 py-1 font-mono text-xs whitespace-nowrap text-acc2">
+              <button
+                onClick={() => setEditMeal(meal)}
+                title="Изменить время"
+                className="shrink-0 rounded-lg bg-acc/12 px-2.5 py-1.5 font-mono text-xs font-semibold whitespace-nowrap text-acc2 transition hover:bg-acc/20"
+              >
                 {meal.time}
-              </div>
+              </button>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold">{meal.title}</div>
                 <div className="truncate text-[11px] text-mute">
@@ -200,13 +198,15 @@ export default function DayView({
 
       {!meals.length && <Empty icon="🍽" text="Добавь первый приём пищи на этот день" />}
 
+      <div className="rounded-3xl border border-acc/25 bg-gradient-to-br from-acc/12 via-panel to-panel p-4 shadow-lg shadow-black/10">
+        <div className="mb-1 text-[11px] font-bold tracking-[0.16em] text-acc uppercase">Главный инструмент</div>
+        <div className="text-lg font-bold">Сними таблицу БЖУ</div>
+        <p className="mt-1 max-w-[34rem] text-xs leading-relaxed text-mute">Фото пищевой ценности на 100 г — приложение распознает калории, белки, жиры и углеводы. Без штрихкода и долгого поиска.</p>
+        <Btn className="mt-3 w-full" onClick={() => { setPhotoFirst(true); setNewMeal(true); }}>📸 Добавить продукт по фото</Btn>
+      </div>
       <div className="flex gap-2">
-        <Btn variant="soft" className="flex-1" onClick={() => setNewMeal(true)}>
-          + Новый приём пищи
-        </Btn>
-        <Btn variant="soft" className="shrink-0 !px-4" title="Сканировать штрихкод" onClick={() => setScanPick(true)}>
-          📷
-        </Btn>
+        <Btn variant="soft" className="flex-1" onClick={() => setNewMeal(true)}>+ Новый приём пищи</Btn>
+        <Btn variant="soft" className="shrink-0 !px-4" title="Дополнительные способы поиска" onClick={() => setScanPick(true)}>⋯</Btn>
       </div>
 
       <Sheet open={scanPick} onClose={() => setScanPick(false)} title="Сканировать штрихкод">
@@ -287,11 +287,16 @@ export default function DayView({
       </Sheet>
 
       {/* Новый приём пищи */}
-      <Sheet open={newMeal} onClose={() => setNewMeal(false)} title="Новый приём пищи">
+      <Sheet open={newMeal} onClose={() => { setNewMeal(false); setPhotoFirst(false); }} title="Новый приём пищи">
         <NewMealForm
           onCreate={(title, time) => {
-            addMeal(title, time);
+            const meal = addMeal(title, time);
             setNewMeal(false);
+            if (photoFirst) {
+              setPhotoFirst(false);
+              setAddMode("photo");
+              setAddTo(meal);
+            }
           }}
         />
       </Sheet>
@@ -362,24 +367,7 @@ function NewMealForm({
   const [time, setTime] = useState(initial?.time ?? "12:00");
   return (
     <div className="space-y-3">
-      {!initial && (
-        <div className="flex flex-wrap gap-2">
-          {PRESETS.map((p) => (
-            <button
-              key={p.title}
-              onClick={() => {
-                setTitle(p.title);
-                setTime(p.time);
-              }}
-              className={`rounded-lg border px-3 py-1.5 text-xs whitespace-nowrap transition ${
-                title === p.title ? "border-acc bg-acc/15 text-acc" : "border-line bg-panel2 hover:border-acc2/50"
-              }`}
-            >
-              {p.title}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="rounded-xl bg-panel2/60 px-3 py-2 text-xs leading-relaxed text-mute">Дай приёму своё название — например, «После тренировки» или «Поздний ужин». Время потом можно изменить нажатием на него в карточке.</div>
       <Field label="Название">
         <input className="field" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Например, Обед" />
       </Field>

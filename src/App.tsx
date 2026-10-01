@@ -47,11 +47,11 @@ export default function App() {
       <header className="sticky top-0 z-30 -mx-4 mb-4 bg-ink/80 px-4 pt-[env(safe-area-inset-top)] pb-3 backdrop-blur-md">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 text-[11px] font-medium tracking-[0.16em] text-mute uppercase">
-              <span>{goal.emoji}</span>
-              <span className="truncate">{goal.label}</span>
+            <div className="flex items-center gap-2 text-[11px] font-bold tracking-[0.16em] text-acc uppercase">
+              <span className="grid size-6 place-items-center rounded-lg bg-acc/15 text-base">{goal.emoji}</span>
+              <span className="leading-tight">LUMEN · {goal.label}</span>
             </div>
-            <h1 className="truncate text-xl font-bold">{TABS.find((t) => t.key === tab)!.label}</h1>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight">{TABS.find((t) => t.key === tab)!.label}</h1>
           </div>
           <div className="shrink-0 rounded-2xl border border-line bg-panel2/70 px-3 py-1.5 text-right">
             <div className="text-lg leading-tight font-bold text-acc">{targets.calories}</div>

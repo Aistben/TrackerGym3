@@ -58,8 +58,8 @@ export default function Onboarding({ onDone }: { onDone: (p: Profile) => void })
             >
               <span className="shrink-0 text-3xl">{GOALS[g].emoji}</span>
               <span className="min-w-0">
-                <span className="block truncate font-semibold">{GOALS[g].label}</span>
-                <span className="block text-xs text-mute">{GOALS[g].desc}</span>
+                <span className="block font-semibold leading-tight">{GOALS[g].label}</span>
+                <span className="mt-1 block text-xs leading-relaxed text-mute">{GOALS[g].desc}</span>
               </span>
             </button>
           ))}
