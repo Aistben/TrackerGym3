@@ -4,15 +4,13 @@ import { GOALS, computeTargets, today } from "./lib/nutrition";
 import Onboarding from "./components/Onboarding";
 import DayView from "./components/DayView";
 import Progress from "./components/Progress";
-import Products from "./components/Products";
 import ProfileView from "./components/ProfileView";
 
-type Tab = "day" | "progress" | "base" | "profile";
+type Tab = "day" | "progress" | "profile";
 
 const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: "day", icon: "🍽", label: "Дневник" },
   { key: "progress", icon: "📈", label: "Прогресс" },
-  { key: "base", icon: "📦", label: "База" },
   { key: "profile", icon: "⚙️", label: "Профиль" },
 ];
 
@@ -46,18 +44,19 @@ export default function App() {
 
   return (
     <div className="mx-auto min-h-dvh max-w-lg px-4 pt-5">
-      <header className="mb-4 flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="text-xs tracking-[0.18em] text-mute uppercase">
-            {goal.emoji} {goal.label}
+      <header className="sticky top-0 z-30 -mx-4 mb-4 bg-ink/80 px-4 pt-[env(safe-area-inset-top)] pb-3 backdrop-blur-md">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 text-[11px] font-medium tracking-[0.16em] text-mute uppercase">
+              <span>{goal.emoji}</span>
+              <span className="truncate">{goal.label}</span>
+            </div>
+            <h1 className="truncate text-xl font-bold">{TABS.find((t) => t.key === tab)!.label}</h1>
           </div>
-          <h1 className="text-xl font-bold">
-            {TABS.find((t) => t.key === tab)!.label}
-          </h1>
-        </div>
-        <div className="shrink-0 text-right">
-          <div className="text-lg font-bold text-acc">{targets.calories}</div>
-          <div className="text-[11px] text-mute">ккал в день</div>
+          <div className="shrink-0 rounded-2xl border border-line bg-panel2/70 px-3 py-1.5 text-right">
+            <div className="text-lg leading-tight font-bold text-acc">{targets.calories}</div>
+            <div className="text-[10px] leading-tight text-mute">ккал в день</div>
+          </div>
         </div>
       </header>
 
@@ -65,25 +64,31 @@ export default function App() {
       {tab === "progress" && (
         <Progress state={state} setState={setState} targets={targets} currentWeight={currentWeight} />
       )}
-      {tab === "base" && <Products state={state} setState={setState} />}
       {tab === "profile" && (
         <ProfileView state={state} setState={setState} targets={targets} currentWeight={currentWeight} />
       )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-ink/95 backdrop-blur">
-        <div className="mx-auto flex max-w-lg">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px] transition ${
-                tab === t.key ? "text-acc" : "text-mute"
-              }`}
-            >
-              <span className="text-lg">{t.icon}</span>
-              {t.label}
-            </button>
-          ))}
+      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-line bg-ink/90 backdrop-blur-md">
+        <div className="mx-auto flex max-w-lg px-2 py-1.5">
+          {TABS.map((t) => {
+            const isActive = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className="relative flex flex-1 flex-col items-center gap-0.5 rounded-xl py-2 text-[11px] font-medium transition"
+              >
+                <span
+                  className={`grid size-9 place-items-center rounded-full text-lg transition ${
+                    isActive ? "bg-acc/15 text-acc" : "text-mute"
+                  }`}
+                >
+                  {t.icon}
+                </span>
+                <span className={isActive ? "text-acc" : "text-mute"}>{t.label}</span>
+              </button>
+            );
+          })}
         </div>
       </nav>
     </div>

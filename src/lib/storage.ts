@@ -9,6 +9,7 @@ export const emptyState: AppState = {
   products: SEED_PRODUCTS,
   meals: [],
   weights: [],
+  recentProductIds: [],
 };
 
 export function loadState(): AppState {
@@ -18,7 +19,7 @@ export function loadState(): AppState {
     const parsed = JSON.parse(raw) as AppState;
     const ids = new Set(parsed.products?.map((p) => p.id));
     const merged = [...(parsed.products ?? []), ...SEED_PRODUCTS.filter((p) => !ids.has(p.id))];
-    return { ...emptyState, ...parsed, products: merged };
+    return { ...emptyState, ...parsed, products: merged, recentProductIds: parsed.recentProductIds ?? [] };
   } catch {
     return emptyState;
   }

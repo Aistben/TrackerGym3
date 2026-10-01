@@ -288,7 +288,7 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
           value={manual}
           onChange={(e) => setManual(e.target.value.replace(/\D/g, ""))}
         />
-        <Btn disabled={manual.length < 6} onClick={() => accept(manual)}>
+        <Btn className="shrink-0" disabled={manual.length < 6} onClick={() => accept(manual)}>
           Найти
         </Btn>
       </div>
