@@ -606,28 +606,28 @@ function EntryEditor({
       </div>
       <Field label="Количество, г / мл">
         <div className="flex items-center gap-2">
-          <IconBtn onClick={() => changeGrams(Math.max(0, value - 10))} title="Уменьшить на 10 г" size={44}>
+          <IconBtn onClick={() => changeGrams(Math.max(0, value - 10))} title="Уменьшить на 10 г" size={48} className="text-xl font-bold">
             −
           </IconBtn>
           <input
-            className="field min-w-0 text-center text-lg"
+            className="field min-w-0 py-3.5 text-center text-2xl font-bold"
             {...numField}
             value={grams}
             onChange={(event) => changeGrams(event.target.value)}
           />
-          <IconBtn onClick={() => changeGrams(value + 10)} title="Увеличить на 10 г" size={44}>
+          <IconBtn onClick={() => changeGrams(value + 10)} title="Увеличить на 10 г" size={48} className="text-xl font-bold">
             +
           </IconBtn>
         </div>
       </Field>
-      <div className="flex flex-wrap justify-center gap-2">
+      <div className="grid grid-cols-4 gap-2">
         {quickValues.map((quick) => (
           <button
             type="button"
             key={quick}
             onClick={() => changeGrams(quick)}
-            className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${
-              value === quick ? "border-acc bg-acc/15 text-acc" : "border-line bg-panel2 hover:border-acc2/60"
+            className={`rounded-xl border py-2.5 text-sm font-semibold transition active:scale-95 ${
+              value === quick ? "border-acc bg-acc/20 text-acc" : "border-line bg-panel2 hover:border-acc2/60"
             }`}
           >
             {quick}
@@ -635,10 +635,10 @@ function EntryEditor({
         ))}
       </div>
       <div className="flex gap-2">
-        <Btn variant="soft" size="sm" className="flex-1" onClick={onCancel}>
+        <Btn variant="soft" className="flex-1 py-3" onClick={onCancel}>
           Отмена
         </Btn>
-        <Btn className="flex-[2]" disabled={value <= 0} onClick={() => onSave(value)}>
+        <Btn className="flex-[2] py-3 text-base" disabled={value <= 0} onClick={() => onSave(value)}>
           Сохранить
         </Btn>
       </div>

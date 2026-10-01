@@ -257,23 +257,39 @@ export default function AddFood({
         </div>
 
         <div className="flex items-center gap-2">
-          <input
-            className="field min-w-0 flex-1 text-center text-lg"
-            {...numField}
-            value={grams}
-            onChange={(e) => setGrams(e.target.value.replace(",", "."))}
-          />
-          <span className="shrink-0 text-sm text-mute">г / мл</span>
+          <button
+            type="button"
+            onClick={() => setGrams(String(Math.max(0, (+grams || 0) - 10)))}
+            className="grid size-12 shrink-0 place-items-center rounded-xl border border-line bg-panel2 text-xl font-bold transition active:scale-95"
+          >
+            −
+          </button>
+          <div className="relative min-w-0 flex-1">
+            <input
+              className="field min-w-0 py-3.5 pr-14 text-center text-2xl font-bold"
+              {...numField}
+              value={grams}
+              onChange={(e) => setGrams(e.target.value.replace(",", "."))}
+            />
+            <span className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-xs text-mute">г / мл</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setGrams(String((+grams || 0) + 10))}
+            className="grid size-12 shrink-0 place-items-center rounded-xl border border-line bg-panel2 text-xl font-bold transition active:scale-95"
+          >
+            +
+          </button>
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
+        <div className="grid grid-cols-4 gap-2">
           {[30, 50, 100, 150, 200, 250].map((v) => (
             <button
               key={v}
               type="button"
               onClick={() => setGrams(String(v))}
-              className={`rounded-lg border px-2.5 py-1 text-xs whitespace-nowrap transition ${
-                +grams === v ? "border-acc bg-acc/15 text-acc" : "border-line bg-panel2 hover:border-acc2/60"
+              className={`rounded-xl border py-2.5 text-sm font-semibold whitespace-nowrap transition active:scale-95 ${
+                +grams === v ? "border-acc bg-acc/20 text-acc" : "border-line bg-panel2 hover:border-acc2/60"
               }`}
             >
               {v}
@@ -283,7 +299,7 @@ export default function AddFood({
             <button
               type="button"
               onClick={() => setGrams(String(picked.portion))}
-              className="rounded-lg border border-acc/40 bg-acc/10 px-2.5 py-1 text-xs whitespace-nowrap text-acc"
+              className="col-span-2 rounded-xl border border-acc/40 bg-acc/10 py-2.5 text-sm font-semibold whitespace-nowrap text-acc active:scale-95"
             >
               порция · {picked.portion}
             </button>
@@ -305,10 +321,10 @@ export default function AddFood({
         </div>
 
         <div className="flex gap-2">
-          <Btn variant="soft" size="sm" className="flex-1" onClick={() => setMode("search")}>
+          <Btn variant="soft" className="flex-1 py-3" onClick={() => setMode("search")}>
             Назад
           </Btn>
-          <Btn className="flex-[2]" disabled={g <= 0} onClick={confirmAdd}>
+          <Btn className="flex-[2] py-3 text-base" disabled={g <= 0} onClick={confirmAdd}>
             Добавить
           </Btn>
         </div>
