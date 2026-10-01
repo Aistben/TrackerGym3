@@ -454,8 +454,8 @@ export default function DayView({
         title={addStep === "portion" ? "Количество" : "Добавить продукт"}
         placement="bottom"
         compact={false}
-        solid={addStep === "portion"}
-        noBackdrop={addStep === "portion"}
+        solid
+        noBackdrop
       >
         {addTo && (
           <AddFood

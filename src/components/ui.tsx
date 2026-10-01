@@ -46,7 +46,7 @@ export function Sheet({
             ? `${compact ? "max-h-[72vh]" : "max-h-[88vh]"} rounded-3xl`
             : compact
               ? "max-h-[58vh] rounded-3xl"
-              : "rounded-3xl sm:rounded-3xl"
+              : "max-h-[74vh] rounded-3xl"
         } ${full ? "h-[92vh] sm:h-[80vh]" : "max-h-[90vh]"} flex flex-col`}
       >
         <div className={`${placement === "center" ? "hidden" : "flex"} shrink-0 flex-col pt-2 sm:hidden`}>
