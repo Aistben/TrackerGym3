@@ -25,6 +25,7 @@ export default function DayView({
   const [newMeal, setNewMeal] = useState(false);
   const [moveMeal, setMoveMeal] = useState<Meal | null>(null);
   const [editMeal, setEditMeal] = useState<Meal | null>(null);
+  const [timePick, setTimePick] = useState<Meal | null>(null);
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   const meals = useMemo(
@@ -40,6 +41,19 @@ export default function DayView({
     const meal = { id: uid(), date, title, time, entries: [] };
     update((ms) => [...ms, meal]);
     return meal;
+  }
+
+  function openPhotoAdd() {
+    // Фото — быстрый сценарий: не заставляем пользователя сначала создавать
+    // отдельную карточку. Используем последний приём или создаём нейтральный.
+    const target = meals[meals.length - 1] ?? addMeal("Новый приём", currentTime());
+    setAddMode("photo");
+    setAddTo(target);
+  }
+
+  function currentTime() {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
   }
 
   function addEntry(mealId: string, e: MealEntry) {
@@ -139,8 +153,8 @@ export default function DayView({
           <div key={meal.id} className="card rise overflow-hidden">
             <div className="flex items-center gap-2.5 border-b border-line px-4 py-3">
               <button
-                onClick={() => setEditMeal(meal)}
-                title="Изменить время"
+                onClick={() => setTimePick(meal)}
+                title="Выбрать время"
                 className="shrink-0 rounded-lg bg-acc/12 px-2.5 py-1.5 font-mono text-xs font-semibold whitespace-nowrap text-acc2 transition hover:bg-acc/20"
               >
                 {meal.time}
@@ -202,7 +216,7 @@ export default function DayView({
         <div className="mb-1 text-[11px] font-bold tracking-[0.16em] text-acc uppercase">Главный инструмент</div>
         <div className="text-lg font-bold">Сними таблицу БЖУ</div>
         <p className="mt-1 max-w-[34rem] text-xs leading-relaxed text-mute">Фото пищевой ценности на 100 г — приложение распознает калории, белки, жиры и углеводы. Без штрихкода и долгого поиска.</p>
-        <Btn className="mt-3 w-full" onClick={() => { setPhotoFirst(true); setNewMeal(true); }}>📸 Добавить продукт по фото</Btn>
+        <Btn className="mt-3 w-full" onClick={openPhotoAdd}>📸 Добавить продукт по фото</Btn>
       </div>
       <div className="flex gap-2">
         <Btn variant="soft" className="flex-1" onClick={() => setNewMeal(true)}>+ Новый приём пищи</Btn>
@@ -320,6 +334,32 @@ export default function DayView({
               setMoveMeal(null);
             }}
           />
+        )}
+      </Sheet>
+
+      {/* Быстрый выбор времени прямо из карточки */}
+      <Sheet open={!!timePick} onClose={() => setTimePick(null)} title={timePick ? `Время · ${timePick.title}` : "Время"}>
+        {timePick && (
+          <div className="space-y-3">
+            <p className="text-sm text-mute">Выбери подходящее время — карточка сразу переместится в дневнике.</p>
+            <div className="grid grid-cols-3 gap-2">
+              {["06:00", "08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00", "22:00"].map((time) => (
+                <button
+                  key={time}
+                  onClick={() => {
+                    update((ms) => ms.map((m) => (m.id === timePick.id ? { ...m, time } : m)));
+                    setTimePick(null);
+                  }}
+                  className={`rounded-xl border px-3 py-3 font-mono text-sm font-semibold transition ${timePick.time === time ? "border-acc bg-acc/12 text-acc" : "border-line bg-panel2 hover:border-acc2/60"}`}
+                >
+                  {time}
+                </button>
+              ))}
+            </div>
+            <Btn variant="soft" className="w-full" onClick={() => { setEditMeal(timePick); setTimePick(null); }}>
+              Другое время…
+            </Btn>
+          </div>
         )}
       </Sheet>
 
