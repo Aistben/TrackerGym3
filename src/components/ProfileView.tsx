@@ -53,12 +53,12 @@ export default function ProfileView({
             <button
               key={g}
               onClick={() => patch({ goal: g, pace: g === "maintain" ? 0 : p.pace || 0.5 })}
-              className={`rounded-xl border px-2 py-3 text-xs transition ${
-                p.goal === g ? "border-acc bg-acc/10 text-acc" : "border-line bg-panel2"
+              className={`rounded-xl border px-2 py-3 text-center text-xs leading-tight transition active:scale-[0.97] ${
+                p.goal === g ? "border-acc bg-acc/10 text-acc" : "border-line bg-panel2 hover:border-acc2/40"
               }`}
             >
               <div className="text-lg">{GOALS[g].emoji}</div>
-              {GOALS[g].label}
+              <span className="line-clamp-1">{GOALS[g].label}</span>
             </button>
           ))}
         </div>
@@ -86,8 +86,8 @@ export default function ProfileView({
             <button
               key={s}
               onClick={() => patch({ sex: s })}
-              className={`rounded-xl border py-2 text-sm transition ${
-                p.sex === s ? "border-acc bg-acc/10 text-acc" : "border-line bg-panel2"
+              className={`rounded-xl border py-2 text-sm font-medium transition active:scale-[0.97] ${
+                p.sex === s ? "border-acc bg-acc/10 text-acc" : "border-line bg-panel2 hover:border-acc2/40"
               }`}
             >
               {s === "male" ? "Мужчина" : "Женщина"}

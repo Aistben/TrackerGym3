@@ -8,7 +8,14 @@
  *  - ссылка, где в пути просто лежит 8–14-значное число
  */
 export function extractBarcode(raw: string): string | null {
-  const text = raw.trim();
+  // GS1 DataMatrix/QR (например, коды «Честного знака») разделяют поля
+  // непечатаемым FNC1 (\x1D) или похожим на него символом, а некоторые
+  // сканеры добавляют спереди служебный префикс символогии AIM (]d2, ]Q3…) —
+  // убираем это, иначе регулярки по AI(01) не доходят до начала строки.
+  const text = raw
+    .replace(/[\x1D\u241D]/g, "")
+    .replace(/^\][A-Za-z]\d/, "")
+    .trim();
   if (!text) return null;
 
   const digitsOnly = text.replace(/\D/g, "");
@@ -37,6 +44,16 @@ export function extractBarcode(raw: string): string | null {
   }
 
   if (/^\d{8,14}$/.test(digitsOnly)) return normalizeGtin(digitsOnly);
+
+  // Последний шанс — но только для не-URL содержимого (ссылки уже разобраны
+  // выше, и лишний раз угадывать цифры в произвольном URL не стоит): если
+  // где-то в строке лежит подряд 8–14 цифр, считаем это кодом товара.
+  // Помогает с DataMatrix/QR в нестандартных форматах маркировки.
+  if (!/^https?:\/\//i.test(text)) {
+    const loose = text.match(/\d{8,14}/);
+    if (loose) return normalizeGtin(loose[0]);
+  }
+
   return null;
 }
 

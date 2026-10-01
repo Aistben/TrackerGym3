@@ -52,22 +52,53 @@ async function fetchOne(host: string, code: string): Promise<Product | null> {
   return mapProduct(data.product);
 }
 
+/** Возвращает первый успешный (не-null) результат; остальные просто игнорируются. */
+function firstFound<T>(tasks: Array<Promise<T | null>>): Promise<T | null> {
+  return new Promise((resolve) => {
+    if (!tasks.length) {
+      resolve(null);
+      return;
+    }
+    let remaining = tasks.length;
+    let settled = false;
+    for (const task of tasks) {
+      task
+        .then((value) => {
+          if (!settled && value != null) {
+            settled = true;
+            resolve(value);
+          }
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          remaining -= 1;
+          if (!settled && remaining === 0) resolve(null);
+        });
+    }
+  });
+}
+
 export async function lookupBarcode(barcode: string): Promise<Product | null> {
   const norm = normalizeGtin(barcode);
   const variants = [...new Set([norm, barcode.replace(/\D/g, ""), norm.replace(/^0+/, "")])].filter((c) => c.length >= 8);
 
-  // Основной карточный API. Российский сервер оставлен вторым резервным маршрутом:
-  // у мобильных провайдеров один из доменов иногда бывает недоступен.
-  for (const host of API_HOSTS) {
-    for (const code of variants) {
-      const found = await fetchOne(host, code).catch(() => null);
-      if (found) return found;
-    }
-  }
+  // Раньше все хосты × варианты кода опрашивались строго по очереди (до 6
+  // запросов с таймаутом 7с каждый) — на деле это выглядело как «сканер
+  // долго висит и ничего не находит». Теперь гоняем их параллельно и берём
+  // первый ответ. Российский сервер оставлен резервным доменом: у мобильных
+  // провайдеров один из них иногда недоступен.
+  const direct = await firstFound(
+    API_HOSTS.flatMap((host) => variants.map((code) => fetchOne(host, code).catch(() => null))),
+  );
+  if (direct) return direct;
 
   // Некоторые карточки индексируются поиском раньше, чем появляются в product API.
-  for (const host of API_HOSTS) {
-    const data = await json(`${host}/api/v2/search?code=${encodeURIComponent(norm)}&page_size=5&fields=${FIELDS}`).catch(() => null);
+  const searches = await Promise.all(
+    API_HOSTS.map((host) =>
+      json(`${host}/api/v2/search?code=${encodeURIComponent(norm)}&page_size=5&fields=${FIELDS}`).catch(() => null),
+    ),
+  );
+  for (const data of searches) {
     const found = (data?.products ?? []).map(mapProduct).find((p: Product | null) => p?.barcode && variants.includes(normalizeGtin(p.barcode)));
     if (found) return found;
   }

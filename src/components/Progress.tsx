@@ -14,7 +14,7 @@ import {
 } from "recharts";
 import type { AppState, Targets } from "../lib/types";
 import { GOALS, dayTotals, etaDays, planWeight, round, shiftDate, shortDate, today } from "../lib/nutrition";
-import { Btn, Empty, Field, Sheet } from "./ui";
+import { Btn, Empty, Field, Sheet, Tabs } from "./ui";
 
 const RANGES = [
   { d: 14, label: "2 недели" },
@@ -91,9 +91,9 @@ export default function Progress({
       </div>
 
       <div className="card p-4">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold">Вес: план и факт</h3>
-          <Btn variant="soft" className="!px-3 !py-1.5 !text-xs" onClick={() => setWeighOpen(true)}>
+          <Btn variant="soft" size="sm" onClick={() => setWeighOpen(true)}>
             + Взвешивание
           </Btn>
         </div>
@@ -135,21 +135,15 @@ export default function Progress({
       </div>
 
       <div className="card p-4">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold">Калории по дням</h3>
-          <div className="flex gap-1">
-            {RANGES.map((r) => (
-              <button
-                key={r.d}
-                onClick={() => setRange(r.d)}
-                className={`rounded-lg px-2.5 py-1 text-[11px] transition ${
-                  range === r.d ? "bg-acc/15 text-acc" : "text-mute hover:text-white"
-                }`}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
+          <Tabs
+            value={range}
+            onChange={setRange}
+            items={RANGES.map((r) => ({ key: r.d, label: r.label }))}
+            fill={false}
+            className="w-auto shrink-0"
+          />
         </div>
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={kcalData} margin={{ top: 5, right: 8, left: -22, bottom: 0 }}>
@@ -210,9 +204,9 @@ const tipStyle = {
 function Stat({ title, value, sub }: { title: string; value: string; sub: string }) {
   return (
     <div className="card p-3">
-      <div className="text-[11px] text-mute">{title}</div>
-      <div className="text-xl font-bold">{value}</div>
-      <div className="text-[11px] text-mute">{sub}</div>
+      <div className="truncate text-[11px] text-mute">{title}</div>
+      <div className="truncate text-xl font-bold">{value}</div>
+      <div className="truncate text-[11px] text-mute">{sub}</div>
     </div>
   );
 }

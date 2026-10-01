@@ -52,13 +52,13 @@ export default function Onboarding({ onDone }: { onDone: (p: Profile) => void })
                 setGoal(g);
                 if (g === "maintain") setTarget(weight);
               }}
-              className={`flex w-full items-center gap-4 rounded-2xl border p-4 text-left transition ${
-                goal === g ? "border-acc bg-acc/10" : "border-line bg-panel"
+              className={`flex w-full items-center gap-4 rounded-2xl border p-4 text-left transition active:scale-[0.98] ${
+                goal === g ? "border-acc bg-acc/10" : "border-line bg-panel hover:border-acc2/40"
               }`}
             >
-              <span className="text-3xl">{GOALS[g].emoji}</span>
-              <span>
-                <span className="block font-semibold">{GOALS[g].label}</span>
+              <span className="shrink-0 text-3xl">{GOALS[g].emoji}</span>
+              <span className="min-w-0">
+                <span className="block truncate font-semibold">{GOALS[g].label}</span>
                 <span className="block text-xs text-mute">{GOALS[g].desc}</span>
               </span>
             </button>
@@ -73,8 +73,8 @@ export default function Onboarding({ onDone }: { onDone: (p: Profile) => void })
               <button
                 key={s}
                 onClick={() => setSex(s)}
-                className={`rounded-xl border py-3 font-medium transition ${
-                  sex === s ? "border-acc bg-acc/10 text-acc" : "border-line bg-panel"
+                className={`rounded-xl border py-3 font-medium transition active:scale-[0.97] ${
+                  sex === s ? "border-acc bg-acc/10 text-acc" : "border-line bg-panel hover:border-acc2/40"
                 }`}
               >
                 {s === "male" ? "Мужчина" : "Женщина"}
@@ -115,15 +115,15 @@ export default function Onboarding({ onDone }: { onDone: (p: Profile) => void })
               <button
                 key={a}
                 onClick={() => setActivity(a)}
-                className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition ${
-                  activity === a ? "border-acc bg-acc/10" : "border-line bg-panel"
+                className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition active:scale-[0.98] ${
+                  activity === a ? "border-acc bg-acc/10" : "border-line bg-panel hover:border-acc2/40"
                 }`}
               >
-                <span>
-                  <span className="block text-sm font-medium">{ACTIVITY[a].label}</span>
-                  <span className="block text-xs text-mute">{ACTIVITY[a].hint}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{ACTIVITY[a].label}</span>
+                  <span className="block truncate text-xs text-mute">{ACTIVITY[a].hint}</span>
                 </span>
-                <span className="font-mono text-xs text-mute">×{ACTIVITY[a].k}</span>
+                <span className="shrink-0 font-mono text-xs whitespace-nowrap text-mute">×{ACTIVITY[a].k}</span>
               </button>
             ))}
           </div>

@@ -78,4 +78,6 @@ export interface AppState {
   products: Product[];
   meals: Meal[];
   weights: WeighIn[];
+  /** id-ы продуктов в порядке последнего использования (самый свежий — первый) */
+  recentProductIds: string[];
 }
