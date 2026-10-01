@@ -1,24 +1,23 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink: #0b1016;
-  --color-panel: #151d28;
-  --color-panel2: #202b39;
-  --color-line: #344252;
-  --color-mute: #9aa9b9;
-  --color-acc: #ffb454;
-  --color-acc2: #72e2d1;
-  --color-warn: #ffcb68;
-  --color-bad: #ff7f86;
+  --color-ink: #f7f7f4;
+  --color-panel: #ffffff;
+  --color-panel2: #f0f1ed;
+  --color-line: #dedfd9;
+  --color-mute: #747a78;
+  --color-acc: #ff7657;
+  --color-acc2: #159a91;
+  --color-warn: #e9a329;
+  --color-bad: #e45f69;
 }
 
-html, body, #root { height: 100%; }
+html, body, #root { min-height: 100%; }
 body {
   margin: 0;
-  background: radial-gradient(circle at 10% -10%, #24384a 0, transparent 31rem), radial-gradient(circle at 100% 20%, #2b2634 0, transparent 28rem), var(--color-ink);
-  background-attachment: fixed;
-  color: #f6f8fa;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  background: #f7f7f4;
+  color: #202522;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
 }
@@ -26,25 +25,40 @@ body {
 body { overflow-x: hidden; }
 input, select, textarea, button { font: inherit; color: inherit; }
 p, span, div, button, label { overflow-wrap: anywhere; }
+button { cursor: pointer; }
 img, svg, video, canvas { max-width: 100%; }
 input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-thumb { background: #344252; border-radius: 99px; }
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-thumb { background: #c8cbc3; border-radius: 99px; }
 
+/* Новая визуальная система: чистый editorial-интерфейс, много воздуха и один яркий CTA. */
 @utility card {
-  background: linear-gradient(145deg, color-mix(in srgb, var(--color-panel) 94%, white), var(--color-panel));
-  border: 1px solid var(--color-line);
-  border-radius: 1.5rem;
-  box-shadow: 0 18px 42px rgb(0 0 0 / .18), inset 0 1px 0 rgb(255 255 255 / .045);
+  background: var(--color-panel);
+  border: 1px solid #e6e7e1;
+  border-radius: 1.35rem;
+  box-shadow: 0 8px 26px rgb(39 45 42 / .06);
 }
 @utility field {
-  width: 100%; background: var(--color-panel2); border: 1px solid var(--color-line); border-radius: 1rem;
-  padding: .72rem .9rem; outline: none; transition: border-color .15s, box-shadow .15s;
+  width: 100%; background: #f7f8f5; border: 1px solid #dfe2db; border-radius: .9rem;
+  padding: .75rem .9rem; outline: none; transition: border-color .15s, box-shadow .15s, background .15s;
 }
-.field:focus { border-color: var(--color-acc2); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-acc2) 20%, transparent); }
-:focus-visible { outline: 2px solid color-mix(in srgb, var(--color-acc2) 70%, transparent); outline-offset: 2px; }
+.field:focus { background: white; border-color: var(--color-acc2); box-shadow: 0 0 0 3px rgb(21 154 145 / .13); }
+:focus-visible { outline: 2px solid rgb(21 154 145 / .65); outline-offset: 2px; }
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
-@keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.text-white { color: #202522 !important; }
+
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 .rise { animation: rise .22s ease-out both; }
 @keyframes sheet-in { from { transform: translateY(100%); } to { transform: none; } }
 .sheet-in { animation: sheet-in .25s cubic-bezier(.22,1,.36,1) both; }
+
+/* переопределяем старые dark utility-комбинации, чтобы весь интерфейс выглядел цельно */
+.bg-ink\/80, .bg-ink\/90 { background-color: rgb(247 247 244 / .92) !important; }
+.bg-panel2\/60, .bg-panel2\/70 { background-color: rgb(240 241 237 / .75) !important; }
+.bg-acc\/8 { background-color: rgb(255 118 87 / .08) !important; }
+.bg-acc\/10 { background-color: rgb(255 118 87 / .10) !important; }
+.bg-acc\/12 { background-color: rgb(255 118 87 / .12) !important; }
+
+@media (min-width: 640px) {
+  body { background: linear-gradient(120deg, #f4f6f1, #fbfaf8 45%, #f1f7f5); }
+}

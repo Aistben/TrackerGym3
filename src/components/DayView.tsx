@@ -369,7 +369,7 @@ function NewMealForm({
     <div className="space-y-3">
       <div className="rounded-xl bg-panel2/60 px-3 py-2 text-xs leading-relaxed text-mute">Дай приёму своё название — например, «После тренировки» или «Поздний ужин». Время потом можно изменить нажатием на него в карточке.</div>
       <Field label="Название">
-        <input className="field" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Например, Обед" />
+        <input className="field" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Например, После тренировки" />
       </Field>
       <Field label="Время приёма">
         <input type="time" className="field" value={time} onChange={(e) => setTime(e.target.value)} />
