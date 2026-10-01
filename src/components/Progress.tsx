@@ -13,7 +13,7 @@ import {
 } from "recharts";
 import type { AppState, Targets } from "../lib/types";
 import { GOALS, dayTotals, etaDays, planWeight, round, shiftDate, shortDate, today } from "../lib/nutrition";
-import { Btn, Empty, Field, Sheet, Tabs } from "./ui";
+import { Btn, Empty, Field, Sheet, Tabs, numField } from "./ui";
 
 const RANGES = [
   { d: 14, label: "2 недели" },
@@ -214,8 +214,7 @@ function WeighForm({
         <Field label="Вес, кг">
           <input
             className="field"
-            inputMode="decimal"
-            autoFocus
+            {...numField}
             value={w}
             placeholder="82.4"
             onChange={(e) => setW(e.target.value.replace(",", "."))}

@@ -248,3 +248,23 @@ export function Empty({ icon, text }: { icon: string; text: string }) {
     </div>
   );
 }
+
+/** Общие атрибуты полей: гасят автозаполнение/подсказки браузера
+ * (та самая белая панель над клавиатурой с «ключ-картами» и т.п.) */
+export const noSuggest = {
+  autoComplete: "off",
+  autoCorrect: "off",
+  autoCapitalize: "off",
+  spellCheck: false,
+  "data-form-type": "other",
+  "data-lpignore": "true",
+  "data-1p-ignore": "true",
+} as const;
+
+/** Числовое поле: только цифровая клавиатура, без автозаполнения */
+export const numField = {
+  ...noSuggest,
+  type: "text" as const,
+  inputMode: "decimal" as const,
+  enterKeyHint: "done" as const,
+};

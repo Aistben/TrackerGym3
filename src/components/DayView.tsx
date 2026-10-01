@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { AppState, Meal, MealEntry, Product, Targets } from "../lib/types";
 import { dayTotals, entryTotals, humanDate, round, shiftDate, sumTotals, today } from "../lib/nutrition";
 import { uid } from "../lib/storage";
-import { Bar, Btn, Empty, Field, IconBtn, Ring, Sheet } from "./ui";
+import { Bar, Btn, Empty, Field, IconBtn, Ring, Sheet, noSuggest, numField } from "./ui";
 import AddFood from "./AddFood";
 
 type EntryAction = { mealId: string; mealTitle: string; entry: MealEntry };
@@ -473,17 +473,6 @@ export default function DayView({
               setEditEntry(null);
               notify("Количество продукта изменено");
             }}
-            onMove={() => {
-              setPreview(null);
-              setMoveEntry(editEntry);
-              setEditEntry(null);
-            }}
-            onDelete={() => {
-              removeEntry(editEntry.mealId, editEntry.entry.id);
-              setPreview(null);
-              setEditEntry(null);
-              notify("Продукт удалён");
-            }}
           />
         )}
       </Sheet>
@@ -560,14 +549,10 @@ function EntryEditor({
   action,
   onPreview,
   onSave,
-  onMove,
-  onDelete,
 }: {
   action: EntryAction;
   onPreview: (grams: number) => void;
   onSave: (grams: number) => void;
-  onMove: () => void;
-  onDelete: () => void;
 }) {
   const [grams, setGrams] = useState(String(action.entry.grams));
   const value = Math.max(0, Number(grams.replace(",", ".")) || 0);
@@ -581,10 +566,10 @@ function EntryEditor({
   const quickValues = [30, 50, 100, 150, 200, 250, 300];
 
   return (
-    <div className="space-y-4">
-      <div className="card p-4">
-        <div className="font-semibold">{action.entry.name}</div>
-        <div className="mt-1 text-xs text-mute">
+    <div className="space-y-3">
+      <div className="card px-3 py-2.5">
+        <div className="truncate text-sm font-semibold">{action.entry.name}</div>
+        <div className="truncate text-[11px] text-mute">
           {action.mealTitle && `${action.mealTitle} · `}на 100 г: {action.entry.kcal} ккал
         </div>
       </div>
@@ -594,9 +579,8 @@ function EntryEditor({
             −
           </IconBtn>
           <input
-            className="field text-center text-lg"
-            inputMode="decimal"
-            autoFocus
+            className="field min-w-0 text-center text-lg"
+            {...numField}
             value={grams}
             onChange={(event) => changeGrams(event.target.value)}
           />
@@ -611,7 +595,7 @@ function EntryEditor({
             type="button"
             key={quick}
             onClick={() => changeGrams(quick)}
-            className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+            className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${
               value === quick ? "border-acc bg-acc/15 text-acc" : "border-line bg-panel2 hover:border-acc2/60"
             }`}
           >
@@ -619,30 +603,22 @@ function EntryEditor({
           </button>
         ))}
       </div>
-      <div className="grid grid-cols-4 gap-2 text-center">
+      <div className="grid grid-cols-4 gap-1.5 text-center">
         {[
           ["Ккал", round(total.kcal)],
           ["Белки", round(total.protein, 1)],
           ["Жиры", round(total.fat, 1)],
           ["Углев.", round(total.carbs, 1)],
         ].map(([label, number]) => (
-          <div key={label as string} className="card px-1.5 py-3">
-            <div className="truncate text-lg font-bold">{number}</div>
-            <div className="truncate text-[11px] text-mute">{label}</div>
+          <div key={label as string} className="card px-1 py-2">
+            <div className="truncate text-base font-bold">{number}</div>
+            <div className="truncate text-[10px] text-mute">{label}</div>
           </div>
         ))}
       </div>
       <Btn className="w-full" disabled={value <= 0} onClick={() => onSave(value)}>
-        Сохранить граммы
+        Сохранить
       </Btn>
-      <div className="grid grid-cols-2 gap-2">
-        <Btn variant="soft" onClick={onMove}>
-          Перенести в другой приём
-        </Btn>
-        <Btn variant="danger" onClick={onDelete}>
-          Удалить продукт
-        </Btn>
-      </div>
     </div>
   );
 }
@@ -809,6 +785,7 @@ function TimePicker({
       <Field label="Название (необязательно)">
         <input
           className="field"
+          {...noSuggest}
           value={mealName}
           onChange={(event) => setMealName(event.target.value)}
           placeholder="Оставьте пустым"
@@ -881,7 +858,7 @@ function NewMealForm({ onCreate }: { onCreate: (title: string, time: string) => 
         Название необязательно. Если оставить поле пустым, карточка останется без названия. Время можно изменить позже.
       </div>
       <Field label="Название (необязательно)">
-        <input className="field" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Например, После тренировки" />
+        <input className="field" {...noSuggest} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Например, После тренировки" />
       </Field>
       <Field label="Время приёма">
         <input type="time" className="field" value={time} onChange={(e) => setTime(e.target.value)} />
