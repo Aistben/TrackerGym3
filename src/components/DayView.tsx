@@ -333,8 +333,11 @@ export default function DayView({
                 {meal.title?.trim() && meal.title.trim() !== "Приём" && (
                   <div className="truncate text-sm font-semibold">{meal.title.trim()}</div>
                 )}
-                <div className="truncate text-[11px] text-mute">
-                  {round(t.kcal)} ккал · Б {round(t.protein)} · Ж {round(t.fat)} · У {round(t.carbs)}
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] font-semibold">
+                  <span className="text-ink">{round(t.kcal)} ккал</span>
+                  <span className="text-acc2">Б {round(t.protein)}</span>
+                  <span className="text-warn">Ж {round(t.fat)}</span>
+                  <span className="text-acc">У {round(t.carbs)}</span>
                 </div>
               </div>
               <IconBtn onClick={() => copyMeal(meal, shiftDate(date, 1))} title="Копия на завтра" size={32}>
@@ -372,8 +375,11 @@ export default function DayView({
                     >
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm">{entry.name}</div>
-                        <div className="truncate text-[11px] text-mute">
-                          {round(entry.grams)} г · Б {round(totalsForEntry.protein, 1)} · Ж {round(totalsForEntry.fat, 1)} · У {round(totalsForEntry.carbs, 1)}
+                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px]">
+                          <span className="text-mute">{round(entry.grams)} г</span>
+                          <span className="font-semibold text-acc2">Б {round(totalsForEntry.protein, 1)}</span>
+                          <span className="font-semibold text-warn">Ж {round(totalsForEntry.fat, 1)}</span>
+                          <span className="font-semibold text-acc">У {round(totalsForEntry.carbs, 1)}</span>
                         </div>
                       </div>
                       <div className="shrink-0 text-sm font-medium">{round(totalsForEntry.kcal)}</div>
