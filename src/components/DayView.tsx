@@ -400,7 +400,7 @@ export default function DayView({
         </div>
       </Sheet>
 
-      <Sheet open={!!addTo} onClose={closeAddFood} title={`${addTo?.time} · ${mealTitle(addTo?.title ?? "")}`} full>
+      <Sheet open={!!addTo} onClose={closeAddFood} title="Добавить продукт" full>
         {addTo && (
           <AddFood
             key={addTo.id + addMode}

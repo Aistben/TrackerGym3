@@ -368,11 +368,6 @@ export default function AddFood({
   /* ---------- поиск: недавние / вся база ---------- */
   return (
     <div className="space-y-3">
-      <div className="rounded-2xl border border-acc/25 bg-acc/8 p-3">
-        <div className="font-semibold">📸 Основной способ — фото БЖУ</div>
-        <div className="mt-1 text-xs leading-relaxed text-mute">Сфотографируй строку «на 100 г» — заполним карточку автоматически.</div>
-        <Btn className="mt-3 w-full" onClick={() => { setDraft({ ...blankDraft }); setMode("photo"); }}>Сфотографировать БЖУ</Btn>
-      </div>
       <div className="flex gap-2">
         <input
           ref={searchRef}
