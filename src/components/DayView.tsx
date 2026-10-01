@@ -269,7 +269,10 @@ export default function DayView({
       </div>
       <div className="text-center text-[11px] text-mute">Свайп влево или вправо — другой день</div>
 
-      <div className="sticky top-0 z-40 -mx-4 px-4 pt-1 pb-2">
+      <div
+        className="sticky top-0 z-40 -mx-4 px-4 pt-1 pb-2 backdrop-blur-xl"
+        style={{ background: "linear-gradient(180deg, rgb(21 15 38 / .97) 70%, rgb(21 15 38 / .8))" }}
+      >
       <div className="card flex items-center gap-4 p-4">
         <Ring
           value={totals.kcal}
@@ -294,7 +297,7 @@ export default function DayView({
       </div>
 
       {editEntry && (
-        <div className="rise card mt-2 p-3" data-no-swipe>
+        <div className="rise mt-2 rounded-2xl border border-line p-3 shadow-xl shadow-black/40" style={{ background: "#241a40" }} data-no-swipe>
           <EntryEditor
             action={editEntry}
             onPreview={(grams) => setPreview({ mealId: editEntry.mealId, entryId: editEntry.entry.id, grams })}
@@ -450,7 +453,8 @@ export default function DayView({
         onClose={closeAddFood}
         title={addStep === "portion" ? "Количество" : "Добавить продукт"}
         placement="bottom"
-        compact={addStep === "portion"}
+        compact={false}
+        solid={addStep === "portion"}
         noBackdrop={addStep === "portion"}
       >
         {addTo && (

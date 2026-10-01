@@ -9,6 +9,7 @@ export function Sheet({
   center = false,
   compact = false,
   noBackdrop = false,
+  solid = false,
   placement = center ? "center" : "bottom",
 }: {
   open: boolean;
@@ -19,6 +20,8 @@ export function Sheet({
   center?: boolean;
   compact?: boolean;
   noBackdrop?: boolean;
+  /** непрозрачный фон — карточки под шторкой не просвечивают */
+  solid?: boolean;
   placement?: "center" | "bottom";
 }) {
   useEffect(() => {
@@ -37,7 +40,8 @@ export function Sheet({
     <div className={`fixed inset-0 z-50 flex justify-center ${placement === "center" ? "items-center p-4" : "items-end p-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))]"}`}>
       {!noBackdrop && <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />}
       <div
-        className={`sheet-in relative w-full ${compact ? "max-w-sm" : "max-w-lg"} overflow-hidden border border-line bg-panel shadow-2xl shadow-black/40 ${
+        style={solid ? { background: "#241a40" } : undefined}
+        className={`sheet-in relative w-full ${compact ? "max-w-sm" : "max-w-lg"} overflow-hidden border border-line ${solid ? "backdrop-blur-none" : "bg-panel"} shadow-2xl shadow-black/60 ${
           placement === "center"
             ? `${compact ? "max-h-[72vh]" : "max-h-[88vh]"} rounded-3xl`
             : compact
