@@ -144,7 +144,7 @@ export default function Onboarding({ onDone }: { onDone: (p: Profile) => void })
                 step={0.1}
                 value={pace}
                 onChange={(e) => setPace(e.target.value)}
-                className="w-full accent-[#4ade80]"
+                className="w-full accent-[#2dd4bf]"
               />
             </Field>
           )}

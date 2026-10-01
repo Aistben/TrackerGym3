@@ -35,7 +35,7 @@ export function Sheet({
   if (!open) return null;
   return (
     <div className={`fixed inset-0 z-50 flex justify-center ${placement === "center" ? "items-center p-4" : "items-end p-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))]"}`}>
-      {!noBackdrop && <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />}
+      {!noBackdrop && <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />}
       <div
         className={`sheet-in relative w-full ${compact ? "max-w-sm" : "max-w-lg"} overflow-hidden border border-line bg-panel shadow-2xl shadow-black/40 ${
           placement === "center"
@@ -106,9 +106,9 @@ export function Btn({
   title?: string;
 }) {
   const styles = {
-    primary: "bg-acc text-ink shadow-sm shadow-acc/30 hover:brightness-110",
+    primary: "bg-acc text-white shadow-sm shadow-acc/40 hover:brightness-110",
     soft: "bg-panel2 text-ink border border-line hover:border-acc2/60 hover:bg-panel2/70",
-    ghost: "text-mute hover:text-ink hover:bg-black/5",
+    ghost: "text-mute hover:text-ink hover:bg-white/10",
     danger: "bg-bad/15 text-bad border border-bad/30 hover:bg-bad/25",
   }[variant];
   const sizing = size === "sm" ? "px-3 py-1.5 text-xs" : "px-4 py-2.5 text-sm";
@@ -177,7 +177,7 @@ export function Tabs<T extends string | number>({
           onClick={() => onChange(it.key)}
           className={`truncate rounded-lg px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
             fill ? "flex-1" : ""
-          } ${value === it.key ? "bg-acc text-ink shadow-sm" : "text-mute hover:text-ink"}`}
+          } ${value === it.key ? "bg-acc text-white shadow-sm shadow-acc/30" : "text-mute hover:text-ink"}`}
         >
           {it.label}
         </button>

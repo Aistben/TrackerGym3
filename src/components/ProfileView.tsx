@@ -73,7 +73,7 @@ export default function ProfileView({
                 step={0.1}
                 value={p.pace}
                 onChange={(e) => patch({ pace: +e.target.value })}
-                className="w-full accent-[#4ade80]"
+                className="w-full accent-[#2dd4bf]"
               />
             </Field>
           </div>
@@ -161,7 +161,7 @@ export default function ProfileView({
             step={25}
             value={p.calorieAdjust}
             onChange={(e) => patch({ calorieAdjust: +e.target.value })}
-            className="w-full accent-[#38bdf8]"
+            className="w-full accent-[#a855f7]"
           />
         </Field>
 
@@ -173,7 +173,7 @@ export default function ProfileView({
               setCustom(e.target.checked);
               patch({ customMacros: e.target.checked ? macros : null });
             }}
-            className="size-4 accent-[#4ade80]"
+            className="size-4 accent-[#2dd4bf]"
           />
           Задать БЖУ вручную
         </label>

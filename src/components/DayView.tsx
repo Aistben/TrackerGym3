@@ -487,7 +487,6 @@ export default function DayView({
           onCreate={(title, time) => {
             addMeal(title, time);
             setNewMeal(false);
-            notify("Новый приём добавлен");
           }}
         />
       </Sheet>

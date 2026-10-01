@@ -119,19 +119,19 @@ export default function Progress({
             <ComposedChart data={weightData} margin={{ top: 5, right: 10, left: -18, bottom: 0 }}>
               <defs>
                 <linearGradient id="gw" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#a855f7" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="#a855f7" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="#dfd5ec" vertical={false} />
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#756989" }} interval="preserveStartEnd" minTickGap={24} />
-              <YAxis yAxisId="weight" tick={{ fontSize: 10, fill: "#756989" }} domain={["dataMin - 1.5", "dataMax + 1.5"]} />
-              <Tooltip contentStyle={tipStyle} labelStyle={{ color: "#756989" }} />
-              <ReferenceLine yAxisId="weight" y={profile.targetWeight} stroke="#159c8c" strokeDasharray="4 4" />
-              <Line yAxisId="weight" type="monotone" dataKey="план" name="План, кг" stroke="#159c8c" strokeWidth={1.6} strokeDasharray="5 5" dot={false} />
+              <CartesianGrid stroke="#3b2d60" vertical={false} />
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#b0a2cf" }} interval="preserveStartEnd" minTickGap={24} />
+              <YAxis yAxisId="weight" tick={{ fontSize: 10, fill: "#b0a2cf" }} domain={["dataMin - 1.5", "dataMax + 1.5"]} />
+              <Tooltip contentStyle={tipStyle} labelStyle={{ color: "#b0a2cf" }} />
+              <ReferenceLine yAxisId="weight" y={profile.targetWeight} stroke="#2dd4bf" strokeDasharray="4 4" />
+              <Line yAxisId="weight" type="monotone" dataKey="план" name="План, кг" stroke="#2dd4bf" strokeWidth={1.6} strokeDasharray="5 5" dot={false} />
               <Area yAxisId="weight" type="monotone" dataKey="факт" name="Вес, кг" stroke="none" fill="url(#gw)" connectNulls />
-              <Line yAxisId="weight" type="monotone" dataKey="факт" name="Вес, кг" stroke="#8b5cf6" strokeWidth={2.4} dot={{ r: 3, fill: "#8b5cf6" }} connectNulls />
-              <Legend verticalAlign="bottom" height={20} wrapperStyle={{ fontSize: 11, color: "#756989" }} />
+              <Line yAxisId="weight" type="monotone" dataKey="факт" name="Вес, кг" stroke="#a855f7" strokeWidth={2.4} dot={{ r: 3, fill: "#a855f7" }} connectNulls />
+              <Legend verticalAlign="bottom" height={20} wrapperStyle={{ fontSize: 11, color: "#b0a2cf" }} />
             </ComposedChart>
           </ResponsiveContainer>
         )}
@@ -163,8 +163,9 @@ export default function Progress({
 }
 
 const tipStyle = {
-  background: "rgba(255, 255, 255, .9)",
-  border: "1px solid #d8cce9",
+  background: "rgba(30, 20, 54, .94)",
+  border: "1px solid #4c3b77",
+  color: "#f1ebff",
   borderRadius: 12,
   fontSize: 12,
 };
