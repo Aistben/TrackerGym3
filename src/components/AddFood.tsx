@@ -143,6 +143,36 @@ export default function AddFood({
     setMode("form");
   }
 
+  async function lookupDraftProduct() {
+    const code = draft.barcode.replace(/\D/g, "");
+    if (code.length < 8) return;
+    setLoading(true);
+    setNotice("Ищем продукт по штрихкоду…");
+    try {
+      const found = await lookupBarcode(code);
+      if (!found) {
+        setNotice("Продукт не найден. Заполни название и БЖУ вручную.");
+        return;
+      }
+      setDraft((current) => ({
+        ...current,
+        name: found.name,
+        brand: found.brand ?? "",
+        barcode: found.barcode ?? code,
+        kcal: String(found.kcal),
+        protein: String(found.protein),
+        fat: String(found.fat),
+        carbs: String(found.carbs),
+        portion: found.portion ? String(found.portion) : current.portion,
+      }));
+      setNotice("Название, бренд, штрихкод и БЖУ заполнены — проверь данные перед сохранением.");
+    } catch {
+      setNotice("Не удалось получить данные по штрихкоду. Заполни карточку вручную.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function saveDraft() {
     const p: Product = {
       id: editing?.id ?? uid(),
@@ -277,6 +307,11 @@ export default function AddFood({
             />
           </Field>
         </div>
+        {draft.barcode.replace(/\D/g, "").length >= 8 && (
+          <Btn variant="soft" size="sm" className="w-full" disabled={loading} onClick={lookupDraftProduct}>
+            {loading ? "Ищем…" : "Заполнить карточку по штрихкоду"}
+          </Btn>
+        )}
         <LabelScanner onRead={(values) => setDraft((current) => ({ ...current, ...values }))} />
         <div className="text-xs text-mute">Пищевая ценность на 100 г / 100 мл</div>
         <div className="grid grid-cols-2 gap-3">

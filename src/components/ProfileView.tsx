@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import type { ActivityKey, AppState, Goal, Profile, Sex, Targets } from "../lib/types";
 import { ACTIVITY, GOALS, macroCalories, round } from "../lib/nutrition";
 import { emptyState } from "../lib/storage";
-import { Btn, Field } from "./ui";
+import { Btn, Field, Sheet } from "./ui";
 
 export default function ProfileView({
   state,
@@ -17,6 +17,7 @@ export default function ProfileView({
 }) {
   const p = state.profile!;
   const [custom, setCustom] = useState(!!p.customMacros);
+  const [resetOpen, setResetOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const patch = (d: Partial<Profile>) => setState((s) => ({ ...s, profile: { ...s.profile!, ...d } }));
@@ -200,10 +201,10 @@ export default function ProfileView({
         <h3 className="text-sm font-semibold">Данные</h3>
         <div className="grid grid-cols-2 gap-2">
           <Btn variant="soft" onClick={exportData}>
-            ⬇️ Экспорт JSON
+            ⬇️ Сохранить данные
           </Btn>
           <Btn variant="soft" onClick={() => fileRef.current?.click()}>
-            ⬆️ Импорт
+            ⬆️ Загрузить данные
           </Btn>
         </div>
         <input
@@ -213,14 +214,32 @@ export default function ProfileView({
           hidden
           onChange={(e) => e.target.files?.[0] && importData(e.target.files[0])}
         />
-        <Btn
-          variant="danger"
-          className="w-full"
-          onClick={() => confirm("Удалить все данные и начать заново?") && setState(emptyState)}
-        >
+        <Btn variant="danger" className="w-full" onClick={() => setResetOpen(true)}>
           Сбросить всё
         </Btn>
       </div>
+
+      <Sheet open={resetOpen} onClose={() => setResetOpen(false)} title="Сбросить все данные?">
+        <div className="space-y-4">
+          <p className="text-sm leading-relaxed text-mute">
+            Профиль, дневник, продукты и история веса будут удалены. Это действие нельзя отменить.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <Btn variant="soft" onClick={() => setResetOpen(false)}>
+              Нет
+            </Btn>
+            <Btn
+              variant="danger"
+              onClick={() => {
+                setState(emptyState);
+                setResetOpen(false);
+              }}
+            >
+              Да, сбросить
+            </Btn>
+          </div>
+        </div>
+      </Sheet>
     </div>
   );
 }

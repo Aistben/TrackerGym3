@@ -40,7 +40,7 @@ export function Sheet({
           <h3 className="min-w-0 flex-1 truncate text-base font-semibold leading-snug">{title}</h3>
           <button
             onClick={onClose}
-            className="grid size-8 shrink-0 place-items-center rounded-full bg-panel2 text-mute transition hover:text-white active:scale-90"
+            className="grid size-8 shrink-0 place-items-center rounded-full bg-panel2 text-mute transition hover:text-ink active:scale-90"
           >
             ✕
           </button>
@@ -95,8 +95,8 @@ export function Btn({
 }) {
   const styles = {
     primary: "bg-acc text-ink shadow-sm shadow-acc/30 hover:brightness-110",
-    soft: "bg-panel2 text-white border border-line hover:border-acc2/60 hover:bg-panel2/70",
-    ghost: "text-mute hover:text-white hover:bg-white/5",
+    soft: "bg-panel2 text-ink border border-line hover:border-acc2/60 hover:bg-panel2/70",
+    ghost: "text-mute hover:text-ink hover:bg-black/5",
     danger: "bg-bad/15 text-bad border border-bad/30 hover:bg-bad/25",
   }[variant];
   const sizing = size === "sm" ? "px-3 py-1.5 text-xs" : "px-4 py-2.5 text-sm";
@@ -135,7 +135,7 @@ export function IconBtn({
       title={title}
       style={{ width: size, height: size }}
       className={`grid shrink-0 place-items-center rounded-full border text-lg transition active:scale-90 ${
-        active ? "border-acc/50 bg-acc/15 text-acc" : "border-line bg-panel2 text-mute hover:text-white"
+        active ? "border-acc/50 bg-acc/15 text-acc" : "border-line bg-panel2 text-mute hover:text-ink"
       } ${className}`}
     >
       {children}
@@ -165,7 +165,7 @@ export function Tabs<T extends string | number>({
           onClick={() => onChange(it.key)}
           className={`truncate rounded-lg px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition ${
             fill ? "flex-1" : ""
-          } ${value === it.key ? "bg-acc text-ink shadow-sm" : "text-mute hover:text-white"}`}
+          } ${value === it.key ? "bg-acc text-ink shadow-sm" : "text-mute hover:text-ink"}`}
         >
           {it.label}
         </button>
