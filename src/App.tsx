@@ -22,7 +22,10 @@ export default function App() {
 
   const currentWeight = useMemo(() => {
     if (!state.profile) return 0;
-    const last = [...state.weights].sort((a, b) => a.date.localeCompare(b.date)).at(-1);
+    const last = [...state.weights]
+      .filter((item) => item.date <= today())
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .at(-1);
     return last?.weight ?? state.profile.startWeight;
   }, [state.weights, state.profile]);
 

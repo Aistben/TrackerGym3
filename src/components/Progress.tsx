@@ -1,10 +1,9 @@
 import { useMemo, useState } from "react";
 import {
   Area,
-  Bar,
-  BarChart,
   CartesianGrid,
   ComposedChart,
+  Legend,
   Line,
   ReferenceLine,
   ResponsiveContainer,
@@ -44,44 +43,51 @@ export default function Progress({
     return out;
   }, [range]);
 
-  const kcalData = useMemo(
-    () =>
-      days.map((d) => {
-        const t = dayTotals(state.meals.filter((m) => m.date === d));
-        return {
-          date: shortDate(d),
-          iso: d,
-          kcal: round(t.kcal),
-          protein: round(t.protein),
-          fat: round(t.fat),
-          carbs: round(t.carbs),
-        };
-      }),
-    [days, state.meals],
-  );
+  const nutritionData = useMemo(() => {
+    const mealsByDate = new Map<string, typeof state.meals>();
+    for (const meal of state.meals) {
+      const meals = mealsByDate.get(meal.date) ?? [];
+      meals.push(meal);
+      mealsByDate.set(meal.date, meals);
+    }
+    return days.map((d) => {
+      const t = dayTotals(mealsByDate.get(d) ?? []);
+      return {
+        date: shortDate(d),
+        iso: d,
+        kcal: round(t.kcal),
+        protein: round(t.protein),
+        fat: round(t.fat),
+        carbs: round(t.carbs),
+      };
+    });
+  }, [days, state.meals]);
 
   const weightData = useMemo(() => {
     const from = shiftDate(today(), -(range - 1));
-    const list: { date: string; iso: string; факт?: number; план: number; ккал?: number }[] = [];
+    const nutritionByDate = new Map(nutritionData.map((item) => [item.iso, item]));
+    const weightsByDate = new Map(state.weights.map((item) => [item.date, item.weight]));
+    const list: { date: string; iso: string; факт?: number; план: number; белки?: number; жиры?: number; углеводы?: number }[] = [];
     const startIso = profile.startDate < from ? from : profile.startDate;
     let iso = startIso;
     const end = shiftDate(today(), 14);
     while (iso <= end) {
-      const w = state.weights.find((x) => x.date === iso);
-      const nutrition = kcalData.find((item) => item.iso === iso);
+      const nutrition = nutritionByDate.get(iso);
       list.push({
         date: shortDate(iso),
         iso,
-        факт: w?.weight,
+        факт: weightsByDate.get(iso),
         план: round(planWeight(profile, iso), 1),
-        ккал: nutrition?.kcal,
+        белки: nutrition?.protein,
+        жиры: nutrition?.fat,
+        углеводы: nutrition?.carbs,
       });
       iso = shiftDate(iso, 1);
     }
     return list;
-  }, [state.weights, profile, range, kcalData]);
+  }, [state.weights, profile, range, nutritionData]);
 
-  const logged = kcalData.filter((d) => d.kcal > 0);
+  const logged = nutritionData.filter((d) => d.kcal > 0);
   const avg = logged.length ? round(logged.reduce((s, d) => s + d.kcal, 0) / logged.length) : 0;
   const avgP = logged.length ? round(logged.reduce((s, d) => s + d.protein, 0) / logged.length) : 0;
   const eta = etaDays(profile, currentWeight);
@@ -99,7 +105,7 @@ export default function Progress({
       <div className="card p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="text-sm font-semibold">Вес и питание по дням</h3>
+            <h3 className="text-sm font-semibold">Вес и БЖУ по дням</h3>
             <p className="mt-1 text-[11px] text-mute">Нажми или проведи пальцем по графику, чтобы увидеть день</p>
           </div>
           <div className="flex items-center gap-2">
@@ -118,7 +124,7 @@ export default function Progress({
         {state.weights.length === 0 ? (
           <Empty icon="⚖️" text="Добавь первое взвешивание — график начнёт строиться" />
         ) : (
-          <ResponsiveContainer width="100%" height={230}>
+          <ResponsiveContainer width="100%" height={270}>
             <ComposedChart data={weightData} margin={{ top: 5, right: 8, left: -22, bottom: 0 }}>
               <defs>
                 <linearGradient id="gw" x1="0" y1="0" x2="0" y2="1">
@@ -129,22 +135,16 @@ export default function Progress({
               <CartesianGrid stroke="#dfd5ec" vertical={false} />
               <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#756989" }} interval="preserveStartEnd" minTickGap={24} />
               <YAxis yAxisId="weight" tick={{ fontSize: 10, fill: "#756989" }} domain={["dataMin - 1.5", "dataMax + 1.5"]} />
-              <YAxis yAxisId="kcal" orientation="right" tick={{ fontSize: 10, fill: "#756989" }} domain={[0, "dataMax + 300"]} />
+              <YAxis yAxisId="macro" orientation="right" tick={{ fontSize: 10, fill: "#756989" }} domain={[0, "dataMax + 10"]} />
               <Tooltip contentStyle={tipStyle} labelStyle={{ color: "#756989" }} />
               <ReferenceLine yAxisId="weight" y={profile.targetWeight} stroke="#159c8c" strokeDasharray="4 4" />
               <Line yAxisId="weight" type="monotone" dataKey="план" name="План, кг" stroke="#159c8c" strokeWidth={1.6} strokeDasharray="5 5" dot={false} />
               <Area yAxisId="weight" type="monotone" dataKey="факт" name="Вес, кг" stroke="none" fill="url(#gw)" connectNulls />
-              <Line
-                yAxisId="weight"
-                type="monotone"
-                dataKey="факт"
-                name="Вес, кг"
-                stroke="#8b5cf6"
-                strokeWidth={2.4}
-                dot={{ r: 3, fill: "#8b5cf6" }}
-                connectNulls
-              />
-              <Line yAxisId="kcal" type="monotone" dataKey="ккал" name="Съедено, ккал" stroke="#d34e6b" strokeWidth={2} dot={false} connectNulls />
+              <Line yAxisId="weight" type="monotone" dataKey="факт" name="Вес, кг" stroke="#8b5cf6" strokeWidth={2.4} dot={{ r: 3, fill: "#8b5cf6" }} connectNulls />
+              <Line yAxisId="macro" type="monotone" dataKey="белки" name="Белки, г" stroke="#159c8c" strokeWidth={2} dot={false} connectNulls />
+              <Line yAxisId="macro" type="monotone" dataKey="жиры" name="Жиры, г" stroke="#c57b16" strokeWidth={2} dot={false} connectNulls />
+              <Line yAxisId="macro" type="monotone" dataKey="углеводы" name="Углеводы, г" stroke="#d34e6b" strokeWidth={2} dot={false} connectNulls />
+              <Legend verticalAlign="bottom" height={24} wrapperStyle={{ fontSize: 11, color: "#756989" }} />
             </ComposedChart>
           </ResponsiveContainer>
         )}
@@ -156,22 +156,7 @@ export default function Progress({
         )}
       </div>
 
-      <div className="card p-4">
-        <h3 className="mb-3 text-sm font-semibold">БЖУ по дням, г</h3>
-        <ResponsiveContainer width="100%" height={190}>
-          <BarChart data={kcalData} margin={{ top: 5, right: 8, left: -22, bottom: 0 }}>
-            <CartesianGrid stroke="#dfd5ec" vertical={false} />
-            <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#756989" }} interval="preserveStartEnd" minTickGap={20} />
-            <YAxis tick={{ fontSize: 10, fill: "#756989" }} />
-            <Tooltip contentStyle={tipStyle} cursor={{ fill: "#ffffff08" }} />
-            <Bar dataKey="protein" name="Белки" stackId="a" fill="#159c8c" />
-            <Bar dataKey="fat" name="Жиры" stackId="a" fill="#c57b16" />
-            <Bar dataKey="carbs" name="Углеводы" stackId="a" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      <Sheet open={weighOpen} onClose={() => setWeighOpen(false)} title="Взвешивание">
+      <Sheet open={weighOpen} onClose={() => setWeighOpen(false)} title="Взвешивание" center>
         <WeighForm
           weights={state.weights}
           onSave={(date, weight) =>

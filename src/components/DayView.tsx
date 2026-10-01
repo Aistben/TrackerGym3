@@ -70,7 +70,7 @@ export default function DayView({
   function notify(message: string) {
     if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current);
     setNotice(message);
-    noticeTimer.current = window.setTimeout(() => setNotice(null), 2200);
+    noticeTimer.current = window.setTimeout(() => setNotice(null), 1200);
   }
 
   useEffect(() => {
@@ -159,7 +159,7 @@ export default function DayView({
     notify(`Продукт перенесён в ${targetMeal ? mealTitle(targetMeal.title) : "другой приём"}`);
   }
 
-  function copyMeal(meal: Meal, targetDate: string, mode: "copy" | "move") {
+  function copyMeal(meal: Meal, targetDate: string) {
     update((ms) => {
       const clone: Meal = {
         ...meal,
@@ -167,16 +167,9 @@ export default function DayView({
         date: targetDate,
         entries: meal.entries.map((e) => ({ ...e, id: uid() })),
       };
-      const rest = mode === "move" ? ms.filter((m) => m.id !== meal.id) : ms;
-      return [...rest, clone];
+      return [...ms, clone];
     });
-    notify(
-      mode === "move"
-        ? `Приём перенесён на ${humanDate(targetDate).toLowerCase()}`
-        : targetDate === meal.date
-          ? "Приём продублирован"
-          : `Копия сохранена на ${humanDate(targetDate).toLowerCase()}`,
-    );
+    notify(targetDate === meal.date ? "Приём продублирован" : `Копия сохранена на ${humanDate(targetDate).toLowerCase()}`);
   }
 
   function openCalendar() {
@@ -289,19 +282,18 @@ export default function DayView({
                 {meal.time}
               </button>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold">{mealTitle(meal.title)}</div>
+                {meal.title?.trim() && meal.title.trim() !== "Приём" && (
+                  <div className="truncate text-sm font-semibold">{meal.title.trim()}</div>
+                )}
                 <div className="truncate text-[11px] text-mute">
                   {round(t.kcal)} ккал · Б {round(t.protein)} · Ж {round(t.fat)} · У {round(t.carbs)}
                 </div>
               </div>
-              <IconBtn onClick={() => copyMeal(meal, shiftDate(date, 1), "copy")} title="Копия на завтра" size={32}>
+              <IconBtn onClick={() => copyMeal(meal, shiftDate(date, 1))} title="Копия на завтра" size={32}>
                 <span className="text-lg leading-none">→</span>
               </IconBtn>
-              <IconBtn onClick={() => copyMeal(meal, date, "copy")} title="Дублировать приём" size={32}>
+              <IconBtn onClick={() => copyMeal(meal, date)} title="Дублировать приём" size={32}>
                 <span className="text-lg leading-none">↗</span>
-              </IconBtn>
-              <IconBtn onClick={() => setTimePick(meal)} title="Изменить время приёма" size={32}>
-                <span className="text-sm">✎</span>
               </IconBtn>
               <IconBtn
                 onClick={() => setDeleteMeal(meal)}
@@ -875,17 +867,9 @@ function Wheel({
   );
 }
 
-function NewMealForm({
-  onCreate,
-  initial,
-  submitLabel = "Добавить",
-}: {
-  onCreate: (title: string, time: string) => void;
-  initial?: Meal;
-  submitLabel?: string;
-}) {
-  const [title, setTitle] = useState(initial?.title === "Приём" ? "" : initial?.title ?? "");
-  const [time, setTime] = useState(initial?.time ?? nowTime());
+function NewMealForm({ onCreate }: { onCreate: (title: string, time: string) => void }) {
+  const [title, setTitle] = useState("");
+  const [time, setTime] = useState(nowTime());
   return (
     <div className="space-y-3">
       <div className="rounded-xl bg-panel2/60 px-3 py-2 text-xs leading-relaxed text-mute">
@@ -898,7 +882,7 @@ function NewMealForm({
         <input type="time" className="field" value={time} onChange={(e) => setTime(e.target.value)} />
       </Field>
       <Btn className="w-full" disabled={!time} onClick={() => onCreate(title.trim(), time)}>
-        {submitLabel}
+        Добавить
       </Btn>
     </div>
   );

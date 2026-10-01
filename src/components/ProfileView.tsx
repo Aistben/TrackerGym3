@@ -97,12 +97,15 @@ export default function ProfileView({
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Возраст">
-            <input className="field" inputMode="numeric" value={p.age} onChange={(e) => patch({ age: +e.target.value || 0 })} />
+            <input className="field" inputMode="numeric" type="number" min={13} max={100} value={p.age} onChange={(e) => patch({ age: +e.target.value || 0 })} />
           </Field>
           <Field label="Рост, см">
             <input
               className="field"
               inputMode="numeric"
+              type="number"
+              min={100}
+              max={250}
               value={p.height}
               onChange={(e) => patch({ height: +e.target.value || 0 })}
             />
@@ -111,6 +114,10 @@ export default function ProfileView({
             <input
               className="field"
               inputMode="decimal"
+              type="number"
+              min={20}
+              max={400}
+              step="0.1"
               value={p.startWeight}
               onChange={(e) => patch({ startWeight: +e.target.value.replace(",", ".") || 0 })}
             />
@@ -119,6 +126,10 @@ export default function ProfileView({
             <input
               className="field"
               inputMode="decimal"
+              type="number"
+              min={20}
+              max={400}
+              step="0.1"
               value={p.targetWeight}
               onChange={(e) => patch({ targetWeight: +e.target.value.replace(",", ".") || 0 })}
             />
@@ -181,7 +192,7 @@ export default function ProfileView({
                     className="field"
                     inputMode="numeric"
                     value={macros[key]}
-                    onChange={(e) => patch({ customMacros: { ...macros, [key]: +e.target.value || 0 } })}
+                    onChange={(e) => patch({ customMacros: { ...macros, [key]: +e.target.value.replace(",", ".") || 0 } })}
                   />
                 </Field>
               ))}

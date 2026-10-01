@@ -22,13 +22,20 @@ export function bmrMifflin(p: { sex: string; weight: number; height: number; age
   return Math.round(p.sex === "male" ? base + 5 : base - 161);
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : min;
+}
+
 export function computeTargets(profile: Profile, currentWeight: number): Targets {
-  const weight = currentWeight || profile.startWeight;
-  const bmr = bmrMifflin({ sex: profile.sex, weight, height: profile.height, age: profile.age });
+  const weight = clamp(currentWeight || profile.startWeight, 20, 400);
+  const height = clamp(profile.height, 100, 250);
+  const age = clamp(profile.age, 13, 100);
+  const pace = clamp(profile.pace || 0, 0, 1);
+  const bmr = bmrMifflin({ sex: profile.sex, weight, height, age });
   const tdee = Math.round(bmr * ACTIVITY[profile.activity].k);
 
   const sign = profile.goal === "lose" ? -1 : profile.goal === "gain" ? 1 : 0;
-  const dailyDelta = sign * ((profile.pace * KCAL_PER_KG) / 7);
+  const dailyDelta = sign * ((pace * KCAL_PER_KG) / 7);
   let calories = Math.round(tdee + dailyDelta + (profile.calorieAdjust || 0));
   calories = Math.max(calories, Math.round(bmr * 0.85));
 

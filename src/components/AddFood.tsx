@@ -4,7 +4,7 @@ import { round } from "../lib/nutrition";
 import { uid } from "../lib/storage";
 import { lookupBarcode, searchOnline } from "../lib/openfoodfacts";
 import { sameBarcode } from "../lib/barcode";
-import { Btn, Empty, Field, IconBtn, Tabs } from "./ui";
+import { Btn, Empty, Field, IconBtn, Sheet, Tabs } from "./ui";
 import Scanner from "./Scanner";
 import LabelScanner from "./LabelScanner";
 
@@ -45,6 +45,7 @@ export default function AddFood({
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState<Product | null>(null);
+  const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
   const [draft, setDraft] = useState({ ...blankDraft });
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -68,25 +69,33 @@ export default function AddFood({
   const abort = useRef<AbortController | null>(null);
   useEffect(() => {
     const s = q.trim();
+    abort.current?.abort();
     if (s.length < 3 || mode !== "search" || lib !== "base") {
       setOnline([]);
+      setLoading(false);
       return;
     }
+    let activeRequest: AbortController | null = null;
     const t = setTimeout(async () => {
-      abort.current?.abort();
       const ac = new AbortController();
+      activeRequest = ac;
       abort.current = ac;
       setLoading(true);
       try {
         const res = await searchOnline(s, ac.signal);
-        setOnline(res.filter((p) => !products.some((lp) => sameBarcode(lp.barcode, p.barcode))));
+        if (!ac.signal.aborted) {
+          setOnline(res.filter((p) => !products.some((lp) => sameBarcode(lp.barcode, p.barcode))));
+        }
       } catch {
-        /* offline — ничего страшного */
+        /* offline or cancelled — ничего страшного */
       } finally {
-        setLoading(false);
+        if (activeRequest === ac) setLoading(false);
       }
     }, 550);
-    return () => clearTimeout(t);
+    return () => {
+      window.clearTimeout(t);
+      activeRequest?.abort();
+    };
   }, [q, mode, lib, products]);
 
   function pick(p: Product, persist = false) {
@@ -398,7 +407,7 @@ export default function AddFood({
 
       <div className="space-y-1.5">
         {list.map((p) => (
-          <Row key={p.id} p={p} onClick={() => pick(p)} onEdit={() => openEdit(p)} onDelete={() => onDeleteProduct(p.id)} />
+          <Row key={p.id} p={p} onClick={() => pick(p)} onEdit={() => openEdit(p)} onDelete={() => setDeleteProduct(p)} />
         ))}
         {!list.length && lib === "recent" && !loading && (
           <Empty icon="🕘" text="Пока нет недавних продуктов — добавь что-нибудь из базы" />
@@ -413,6 +422,29 @@ export default function AddFood({
         {lib === "base" &&
           online.map((p) => <Row key={p.id} p={p} online onClick={() => pick(p, true)} />)}
       </div>
+
+      <Sheet open={!!deleteProduct} onClose={() => setDeleteProduct(null)} title="Удалить продукт?" center>
+        {deleteProduct && (
+          <div className="space-y-4">
+            <p className="text-sm leading-relaxed text-mute">
+              Удалить «{deleteProduct.name}» из твоей базы? Уже добавленные записи в дневнике останутся.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Btn variant="soft" onClick={() => setDeleteProduct(null)}>Нет</Btn>
+              <Btn
+                variant="danger"
+                onClick={() => {
+                  onDeleteProduct(deleteProduct.id);
+                  setDeleteProduct(null);
+                  setNotice("Продукт удалён");
+                }}
+              >
+                Да, удалить
+              </Btn>
+            </div>
+          </div>
+        )}
+      </Sheet>
     </div>
   );
 }

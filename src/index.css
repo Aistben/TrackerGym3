@@ -52,30 +52,6 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 :focus-visible { outline: 2px solid rgb(21 156 140 / .7); outline-offset: 2px; }
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 
-/* Оставлен для совместимости со старыми ссылками на hero в данных/кеше. */
-.photo-hero {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  background: linear-gradient(135deg, rgb(139 92 246 / .9), rgb(21 156 140 / .65));
-}
-.photo-hero::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: linear-gradient(90deg, rgb(43 33 68 / .45), rgb(255 255 255 / .08)), url("./assets/lumen-light-bg.jpg") center / cover;
-  opacity: .9;
-}
-.photo-hero::after {
-  content: "✦";
-  position: absolute;
-  top: 1rem;
-  right: 1.25rem;
-  color: rgb(255 255 255 / .85);
-  font-size: 1.3rem;
-}
-
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 .rise { animation: rise .22s ease-out both; }
 @keyframes sheet-in { from { transform: translateY(100%); } to { transform: none; } }

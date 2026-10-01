@@ -83,15 +83,19 @@ export default function Onboarding({ onDone }: { onDone: (p: Profile) => void })
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Возраст">
-              <input className="field" inputMode="numeric" value={age} onChange={(e) => setAge(e.target.value)} />
+              <input className="field" inputMode="numeric" type="number" min={13} max={100} value={age} onChange={(e) => setAge(e.target.value)} />
             </Field>
             <Field label="Рост, см">
-              <input className="field" inputMode="numeric" value={height} onChange={(e) => setHeight(e.target.value)} />
+              <input className="field" inputMode="numeric" type="number" min={100} max={250} value={height} onChange={(e) => setHeight(e.target.value)} />
             </Field>
             <Field label="Текущий вес, кг">
               <input
                 className="field"
                 inputMode="decimal"
+                type="number"
+                min={20}
+                max={400}
+                step="0.1"
                 value={weight}
                 onChange={(e) => setWeight(e.target.value.replace(",", "."))}
               />
@@ -100,6 +104,10 @@ export default function Onboarding({ onDone }: { onDone: (p: Profile) => void })
               <input
                 className="field"
                 inputMode="decimal"
+                type="number"
+                min={20}
+                max={400}
+                step="0.1"
                 value={target}
                 onChange={(e) => setTarget(e.target.value.replace(",", "."))}
               />
