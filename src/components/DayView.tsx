@@ -410,7 +410,7 @@ function TimePicker({
   return (
     <div className="space-y-4">
       <div>
-        <p className="text-sm text-mute">Проведи пальцем по часам или минутам. Выбранное значение будет в центре.</p>
+        <p className="text-sm text-mute">Проведи пальцем по часам и минутам — обе колонки листаются одинаково. Выбранное значение будет в центре.</p>
         <div className="relative mt-4 grid grid-cols-2 gap-3 overflow-hidden rounded-2xl border border-line bg-panel2/60 p-2">
           <div className="pointer-events-none absolute inset-x-2 top-1/2 z-10 h-12 -translate-y-1/2 rounded-xl border border-acc/40 bg-acc/10" />
           <Wheel label="Часы" values={hours} value={selectedHour} onChange={setSelectedHour} scrollRef={hourRef} />
@@ -448,7 +448,7 @@ function Wheel({
           const index = Math.max(0, Math.min(values.length - 1, Math.round((box.scrollTop + box.clientHeight / 2 - 104) / 48)));
           if (values[index] !== value) onChange(values[index]);
         }}
-        className="h-52 snap-y snap-mandatory overflow-y-auto overscroll-contain py-20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="h-52 touch-pan-y snap-y snap-mandatory select-none overflow-y-auto overscroll-contain py-20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {values.map((item) => (
           <button
