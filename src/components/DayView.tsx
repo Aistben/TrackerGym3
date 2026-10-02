@@ -748,6 +748,7 @@ function EntryRow({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerEnd}
         onPointerCancel={handlePointerEnd}
+        onClick={handleClick}
         className="relative flex items-center gap-2 px-3 py-2"
         style={{
           transform: dx ? `translateX(${dx}px)` : undefined,
@@ -756,9 +757,11 @@ function EntryRow({
           touchAction: "pan-y",
         }}
       >
+        {/* onClick висит на внешнем div: при захвате указателя (свайп-логика)
+            клик приходит на него, а не на кнопку; кнопка нужна для семантики
+            и клавиатуры — её клик всплывёт сюда же, дважды не сработает */}
         <button
           type="button"
-          onClick={handleClick}
           onContextMenu={(event) => event.preventDefault()}
           className="flex min-w-0 flex-1 select-none items-center gap-3 rounded-xl px-1 py-1 text-left transition hover:bg-acc/5 active:bg-acc/10"
           style={{ touchAction: "pan-y" }}
