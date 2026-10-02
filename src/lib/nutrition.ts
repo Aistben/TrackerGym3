@@ -127,13 +127,26 @@ export function shortDate(iso: string) {
   return `${d.getDate()} ${MON[d.getMonth()]}`;
 }
 
-/** Плановая траектория веса по дням */
-export function planWeight(profile: Profile, iso: string) {
-  const n = Math.max(0, daysBetween(profile.startDate, iso));
+/** Точка отсчёта плановой траектории веса */
+export interface WeightAnchor {
+  date: string;
+  weight: number;
+}
+
+/** Плановая траектория веса по дням.
+ * Якорь — последнее взвешивание (если передано), а не старт полгода назад:
+ * иначе после реальных взвешиваний и смены цели линия плана «отставала»
+ * от действительности и показывала старые цифры. */
+export function planWeight(profile: Profile, iso: string, anchor?: WeightAnchor) {
+  const a = anchor && anchor.weight > 0 ? anchor : { date: profile.startDate, weight: profile.startWeight };
+  const n = daysBetween(a.date, iso);
   const sign = profile.goal === "lose" ? -1 : profile.goal === "gain" ? 1 : 0;
-  if (!sign) return profile.startWeight;
+  if (!sign) return a.weight;
   const perDay = (profile.pace / 7) * sign;
-  const w = profile.startWeight + perDay * n;
+  const w = a.weight + perDay * n;
+  // В будущее линия прижимается к текущей цели и дальше неё не уходит,
+  // назад (до якоря) — просто продлеваем ту же траекторию.
+  if (n <= 0) return w;
   return sign < 0 ? Math.max(w, profile.targetWeight) : Math.min(w, profile.targetWeight);
 }
 

@@ -2,6 +2,41 @@ import { useRef, useState } from "react";
 import { Btn } from "./ui";
 import { parseNutritionLabel, type LabelValues } from "../lib/nutritionLabel";
 
+declare global {
+  interface Window {
+    Tesseract?: {
+      createWorker: (
+        langs: string,
+        oem: number,
+        options: { logger?: (event: { status: string; progress: number }) => void },
+      ) => Promise<{
+        recognize: (image: HTMLCanvasElement) => Promise<{ data: { text: string } }>;
+        terminate: () => Promise<unknown>;
+      }>;
+    };
+  }
+}
+
+const TESSERACT_CDN = "https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js";
+let tesseractPromise: Promise<NonNullable<Window["Tesseract"]>> | null = null;
+
+/** OCR очень тяжёлый — подгружаем движок с CDN только в момент
+ * сканирования этикетки, чтобы не раздувать главный бандл приложения. */
+function loadTesseract() {
+  if (!tesseractPromise) {
+    tesseractPromise = new Promise((resolve, reject) => {
+      if (window.Tesseract) return resolve(window.Tesseract);
+      const script = document.createElement("script");
+      script.src = TESSERACT_CDN;
+      script.async = true;
+      script.onload = () => (window.Tesseract ? resolve(window.Tesseract) : reject(new Error("Tesseract не инициализировался")));
+      script.onerror = () => reject(new Error("CDN недоступен"));
+      document.head.appendChild(script);
+    });
+  }
+  return tesseractPromise;
+}
+
 /**
  * Фото с телефона легко весит 10-12+ мегапикселей — Tesseract разбирает его
  * целую вечность (и точность от лишних пикселей не растёт, только от шума и
@@ -44,11 +79,11 @@ export default function LabelScanner({ onRead }: { onRead: (values: LabelValues)
     setMessage("Уменьшаем фото…");
     try {
       const image = await prepareForOcr(file);
-      setMessage("Подготавливаем распознавание…");
-      const { createWorker } = await import("tesseract.js");
-      let worker: Awaited<ReturnType<typeof createWorker>> | null = null;
+      setMessage("Загружаем распознавание…");
+      const tesseract = await loadTesseract();
+      let worker: Awaited<ReturnType<NonNullable<Window["Tesseract"]>["createWorker"]>> | null = null;
       try {
-        worker = await createWorker("rus+eng", 1, {
+        worker = await tesseract.createWorker("rus+eng", 1, {
           logger: (event) => {
             if (event.status === "recognizing text") {
               setProgress(Math.round((event.progress || 0) * 100));
@@ -77,10 +112,10 @@ export default function LabelScanner({ onRead }: { onRead: (values: LabelValues)
   }
 
   return (
-    <div className="rounded-2xl border border-acc2/25 bg-acc2/8 p-3">
-      <div className="mb-1 text-sm font-semibold">📷 Заполнить БЖУ по фотографии</div>
-      <p className="mb-3 text-xs leading-relaxed text-mute">
-        Сфотографируй крупно таблицу пищевой ценности «на 100 г». Распознавание работает на русском и английском.
+    <div className="rounded-xl border border-acc2/25 bg-acc2/8 px-3 py-2.5">
+      <div className="text-[13px] font-semibold">📷 БЖУ по фото этикетки</div>
+      <p className="mt-0.5 mb-2 text-[11px] leading-snug text-mute">
+        Сними крупно таблицу «на 100 г» — поля заполнятся сами (рус/англ).
       </p>
       <input
         ref={inputRef}
@@ -90,10 +125,10 @@ export default function LabelScanner({ onRead }: { onRead: (values: LabelValues)
         hidden
         onChange={(event) => event.target.files?.[0] && recognize(event.target.files[0])}
       />
-      <Btn variant="soft" className="w-full" disabled={busy} onClick={() => inputRef.current?.click()}>
+      <Btn variant="soft" size="sm" className="w-full" disabled={busy} onClick={() => inputRef.current?.click()}>
         {busy ? `${message} ${progress ? progress + "%" : ""}` : "Снять этикетку / выбрать фото"}
       </Btn>
-      {message && !busy && <div className="mt-2 text-xs leading-relaxed text-acc2">{message}</div>}
+      {message && !busy && <div className="mt-1.5 text-[11px] leading-snug text-acc2">{message}</div>}
     </div>
   );
 }

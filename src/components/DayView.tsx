@@ -33,14 +33,13 @@ export default function DayView({
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ mealId: string; entryId: string; grams: number } | null>(null);
+  const [swipedId, setSwipedId] = useState<string | null>(null);
   const [tempMealId, setTempMealId] = useState<string | null>(null);
   const [draftPreview, setDraftPreview] = useState<{ product: Product; grams: number } | null>(null);
   const [addStep, setAddStep] = useState<"search" | "scan" | "form" | "portion" | "photo">("search");
   const lastPhotoRequest = useRef(0);
   const noticeTimer = useRef<number | null>(null);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
-  const holdTimer = useRef<number | null>(null);
-  const longPressTriggered = useRef(false);
 
   const meals = useMemo(
     () => state.meals.filter((m) => m.date === date).sort((a, b) => a.time.localeCompare(b.time)),
@@ -219,26 +218,8 @@ export default function DayView({
     setDate(shiftDate(date, dx < 0 ? 1 : -1));
   }
 
-  function startEntryHold(event: React.PointerEvent, action: EntryAction) {
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-    longPressTriggered.current = false;
-    holdTimer.current = window.setTimeout(() => {
-      longPressTriggered.current = true;
-      setMoveEntry(action);
-    }, 550);
-  }
-
-  function cancelEntryHold() {
-    if (holdTimer.current !== null) window.clearTimeout(holdTimer.current);
-    holdTimer.current = null;
-  }
-
   function openEntry(action: EntryAction) {
-    cancelEntryHold();
-    if (longPressTriggered.current) {
-      longPressTriggered.current = false;
-      return;
-    }
+    setSwipedId(null);
     setEditEntry(action);
   }
 
@@ -320,12 +301,12 @@ export default function DayView({
         const t = sumTotals(meal.entries);
         return (
           <div key={meal.id} className="card rise overflow-hidden">
-            <div className="flex items-center gap-2 border-b border-line px-3 py-3">
+            <div className="flex items-center gap-1.5 border-b border-line px-3 py-2.5">
               <button
                 type="button"
                 onClick={() => setTimePick(meal)}
                 title="Выбрать время"
-                className="shrink-0 rounded-lg bg-acc/12 px-2.5 py-1.5 font-mono text-xs font-semibold whitespace-nowrap text-acc2 transition hover:bg-acc/20"
+                className="shrink-0 rounded-lg bg-acc/12 px-2 py-1.5 font-mono text-xs font-semibold whitespace-nowrap text-acc2 transition hover:bg-acc/20"
               >
                 {meal.time}
               </button>
@@ -333,66 +314,55 @@ export default function DayView({
                 {meal.title?.trim() && meal.title.trim() !== "Приём" && (
                   <div className="truncate text-sm font-semibold">{meal.title.trim()}</div>
                 )}
-                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] font-semibold">
+                {/* КБЖУ приёма — всегда одной строкой, без переносов */}
+                <div className="text-[11px] font-semibold whitespace-nowrap">
                   <span className="text-ink">{round(t.kcal)} ккал</span>
-                  <span className="text-acc2">Б {round(t.protein)}</span>
-                  <span className="text-warn">Ж {round(t.fat)}</span>
-                  <span className="text-acc">У {round(t.carbs)}</span>
+                  <span className="text-acc2"> · Б {round(t.protein)}</span>
+                  <span className="text-warn"> · Ж {round(t.fat)}</span>
+                  <span className="text-acc"> · У {round(t.carbs)}</span>
                 </div>
               </div>
-              <IconBtn onClick={() => copyMeal(meal, shiftDate(date, 1))} title="Копия на завтра" size={32}>
-                <span className="text-lg leading-none">→</span>
+              <IconBtn onClick={() => copyMeal(meal, shiftDate(date, 1))} title="Копия на завтра" size={28}>
+                <span className="block -translate-y-px text-[13px] leading-none">→</span>
               </IconBtn>
-              <IconBtn onClick={() => copyMeal(meal, date)} title="Дублировать приём" size={32}>
-                <span className="text-lg leading-none">↗</span>
+              <IconBtn onClick={() => copyMeal(meal, date)} title="Дублировать приём" size={28}>
+                <span className="block -translate-y-px text-[13px] leading-none">↗</span>
               </IconBtn>
               <IconBtn
                 onClick={() => setDeleteMeal(meal)}
                 title="Удалить приём"
-                size={32}
+                size={28}
                 className="border-bad/40 text-bad hover:text-bad"
               >
-                <span className="text-sm">×</span>
+                <span className="block -translate-y-px text-[13px] leading-none">×</span>
               </IconBtn>
             </div>
 
             <div className="divide-y divide-line">
               {meal.entries.map((entry) => {
-                const totalsForEntry = entryTotals(entry);
                 const action = { mealId: meal.id, mealTitle: mealTitle(meal.title), entry };
                 return (
-                  <div key={entry.id} className="flex items-center gap-2 px-3 py-2">
-                    <button
-                      type="button"
-                      onClick={() => openEntry(action)}
-                      onPointerDown={(event) => startEntryHold(event, action)}
-                      onPointerUp={cancelEntryHold}
-                      onPointerCancel={cancelEntryHold}
-                      onPointerLeave={cancelEntryHold}
-                      onContextMenu={(event) => event.preventDefault()}
-                      className="flex min-w-0 flex-1 select-none items-center gap-3 rounded-xl px-1 py-1 text-left transition hover:bg-acc/5 active:bg-acc/10"
-                      style={{ touchAction: "manipulation" }}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm">{entry.name}</div>
-                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px]">
-                          <span className="text-mute">{round(entry.grams)} г</span>
-                          <span className="font-semibold text-acc2">Б {round(totalsForEntry.protein, 1)}</span>
-                          <span className="font-semibold text-warn">Ж {round(totalsForEntry.fat, 1)}</span>
-                          <span className="font-semibold text-acc">У {round(totalsForEntry.carbs, 1)}</span>
-                        </div>
-                      </div>
-                      <div className="shrink-0 text-sm font-medium">{round(totalsForEntry.kcal)}</div>
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Удалить ${entry.name}`}
-                      onClick={() => removeEntry(meal.id, entry.id)}
-                      className="shrink-0 px-1 text-mute opacity-60 transition hover:text-bad hover:opacity-100"
-                    >
-                      ×
-                    </button>
-                  </div>
+                  <EntryRow
+                    key={entry.id}
+                    entry={entry}
+                    swiped={swipedId === entry.id}
+                    onSwipe={(open) => setSwipedId(open ? entry.id : null)}
+                    onTap={() => openEntry(action)}
+                    onLongPress={() => {
+                      setSwipedId(null);
+                      setMoveEntry(action);
+                    }}
+                    onDelete={() => {
+                      try {
+                        navigator.vibrate?.(40);
+                      } catch {
+                        /* noop */
+                      }
+                      removeEntry(meal.id, entry.id);
+                      setSwipedId(null);
+                      notify("Продукт удалён");
+                    }}
+                  />
                 );
               })}
               {!meal.entries.length && <div className="px-4 py-3 text-xs text-mute">Пока пусто</div>}
@@ -457,11 +427,22 @@ export default function DayView({
       <Sheet
         open={!!addTo}
         onClose={closeAddFood}
-        title={addStep === "portion" ? "Количество" : "Добавить продукт"}
+        title={
+          addStep === "portion"
+            ? "Количество"
+            : addStep === "scan"
+              ? "Сканер штрихкода"
+              : addStep === "form"
+                ? "Карточка продукта"
+                : addStep === "photo"
+                  ? "Продукт по фото"
+                  : "Добавить продукт"
+        }
         placement="bottom"
         compact={false}
         solid
         noBackdrop
+        full
       >
         {addTo && (
           <AddFood
@@ -605,34 +586,34 @@ function EntryEditor({
   const quickValues = [30, 50, 100, 150, 200, 250, 300];
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       <div className="flex items-baseline justify-between gap-2">
-        <div className="min-w-0 truncate text-sm font-semibold">{action.entry.name}</div>
+        <div className="min-w-0 text-sm leading-snug font-semibold break-words">{action.entry.name}</div>
         <div className="shrink-0 text-[11px] whitespace-nowrap text-mute">{action.entry.kcal} ккал/100 г</div>
       </div>
       <Field label="Количество, г / мл">
-        <div className="flex items-center gap-2">
-          <IconBtn onClick={() => changeGrams(Math.max(0, value - 10))} title="Уменьшить на 10 г" size={48} className="text-xl font-bold">
-            −
+        <div className="flex items-center gap-1.5">
+          <IconBtn onClick={() => changeGrams(Math.max(0, value - 10))} title="Уменьшить на 10 г" size={40}>
+            <span className="block -translate-y-px text-lg leading-none font-bold">−</span>
           </IconBtn>
           <input
-            className="field min-w-0 py-3.5 text-center text-2xl font-bold"
+            className="field min-w-0 py-2 text-center text-lg font-bold"
             {...numField}
             value={grams}
             onChange={(event) => changeGrams(event.target.value)}
           />
-          <IconBtn onClick={() => changeGrams(value + 10)} title="Увеличить на 10 г" size={48} className="text-xl font-bold">
-            +
+          <IconBtn onClick={() => changeGrams(value + 10)} title="Увеличить на 10 г" size={40}>
+            <span className="block -translate-y-px text-lg leading-none font-bold">+</span>
           </IconBtn>
         </div>
       </Field>
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-7 gap-1">
         {quickValues.map((quick) => (
           <button
             type="button"
             key={quick}
             onClick={() => changeGrams(quick)}
-            className={`rounded-xl border py-2.5 text-sm font-semibold transition active:scale-95 ${
+            className={`rounded-lg border py-1.5 text-xs font-semibold transition active:scale-95 ${
               value === quick ? "border-acc bg-acc/20 text-acc" : "border-line bg-panel2 hover:border-acc2/60"
             }`}
           >
@@ -641,12 +622,160 @@ function EntryEditor({
         ))}
       </div>
       <div className="flex gap-2">
-        <Btn variant="soft" className="flex-1 py-3" onClick={onCancel}>
+        <Btn variant="soft" className="flex-1" onClick={onCancel}>
           Отмена
         </Btn>
-        <Btn className="flex-[2] py-3 text-base" disabled={value <= 0} onClick={() => onSave(value)}>
+        <Btn className="flex-[2]" disabled={value <= 0} onClick={() => onSave(value)}>
           Сохранить
         </Btn>
+      </div>
+    </div>
+  );
+}
+
+/** Ширина красной зоны удаления при свайпе, px */
+const SWIPE_W = 88;
+
+/**
+ * Строка продукта в приёме:
+ * тап — изменить граммы, долгий тап — перенос в другой приём,
+ * свайп влево — открыть кнопку удаления (вместо крошечного ×).
+ */
+function EntryRow({
+  entry,
+  swiped,
+  onSwipe,
+  onTap,
+  onLongPress,
+  onDelete,
+}: {
+  entry: MealEntry;
+  swiped: boolean;
+  onSwipe: (open: boolean) => void;
+  onTap: () => void;
+  onLongPress: () => void;
+  onDelete: () => void;
+}) {
+  const totals = entryTotals(entry);
+  const [dx, setDx] = useState(0);
+  const drag = useRef<{ x: number; y: number; base: number; mode: "?" | "swipe" | "scroll" } | null>(null);
+  const holdTimer = useRef<number | null>(null);
+  const longPressed = useRef(false);
+  const suppressClick = useRef(false);
+
+  // Открыли другую строку (или что-то ещё) — эту плавно закрываем
+  useEffect(() => {
+    if (!swiped) setDx(0);
+  }, [swiped]);
+
+  function cancelHold() {
+    if (holdTimer.current !== null) window.clearTimeout(holdTimer.current);
+    holdTimer.current = null;
+  }
+
+  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    drag.current = { x: event.clientX, y: event.clientY, base: swiped ? -SWIPE_W : 0, mode: "?" };
+    longPressed.current = false;
+    cancelHold();
+    holdTimer.current = window.setTimeout(() => {
+      longPressed.current = true;
+      onLongPress();
+    }, 550);
+  }
+
+  function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    const d = drag.current;
+    if (!d || d.mode === "scroll") return;
+    const mx = event.clientX - d.x;
+    const my = event.clientY - d.y;
+    if (d.mode === "?") {
+      if (Math.abs(mx) < 9 && Math.abs(my) < 9) return;
+      d.mode = Math.abs(mx) > Math.abs(my) ? "swipe" : "scroll";
+      cancelHold();
+      if (d.mode === "scroll") return;
+    }
+    setDx(Math.max(-SWIPE_W, Math.min(0, d.base + mx)));
+  }
+
+  function handlePointerEnd() {
+    cancelHold();
+    const d = drag.current;
+    drag.current = null;
+    if (d?.mode === "swipe") {
+      suppressClick.current = true;
+      const open = dx <= -SWIPE_W / 2;
+      setDx(open ? -SWIPE_W : 0);
+      onSwipe(open);
+    }
+  }
+
+  function handleClick() {
+    if (suppressClick.current) {
+      suppressClick.current = false;
+      return;
+    }
+    if (longPressed.current) {
+      longPressed.current = false;
+      return;
+    }
+    if (swiped) {
+      setDx(0);
+      onSwipe(false);
+      return;
+    }
+    onTap();
+  }
+
+  return (
+    <div className="relative overflow-hidden">
+      {/* красная зона под строкой — видна при свайпе влево */}
+      <div className="absolute inset-y-0 right-0 flex items-stretch" style={{ width: SWIPE_W }}>
+        <button
+          type="button"
+          aria-label={`Удалить ${entry.name}`}
+          onClick={onDelete}
+          className="flex w-full flex-col items-center justify-center gap-0.5 bg-bad/80 text-white transition active:bg-bad"
+        >
+          <span className="text-base leading-none">🗑</span>
+          <span className="text-[10px] font-semibold">Удалить</span>
+        </button>
+      </div>
+      <div
+        data-no-swipe
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+        className="relative flex items-center gap-2 px-3 py-2"
+        style={{
+          transform: dx ? `translateX(${dx}px)` : undefined,
+          transition: drag.current ? "none" : "transform .18s ease-out",
+          background: "linear-gradient(145deg, rgb(54 39 90), rgb(33 24 57))",
+          touchAction: "pan-y",
+        }}
+      >
+        <button
+          type="button"
+          onClick={handleClick}
+          onContextMenu={(event) => event.preventDefault()}
+          className="flex min-w-0 flex-1 select-none items-center gap-3 rounded-xl px-1 py-1 text-left transition hover:bg-acc/5 active:bg-acc/10"
+          style={{ touchAction: "pan-y" }}
+        >
+          <div className="min-w-0 flex-1">
+            {/* Полное название — без обрезки */}
+            <div className="text-sm leading-snug break-words">{entry.name}</div>
+            {/* граммы и БЖУ — одной строкой */}
+            <div className="mt-0.5 text-[11px] whitespace-nowrap">
+              <span className="text-mute">{round(entry.grams)} г</span>
+              <span className="font-semibold text-acc2"> · Б {round(totals.protein, 1)}</span>
+              <span className="font-semibold text-warn"> · Ж {round(totals.fat, 1)}</span>
+              <span className="font-semibold text-acc"> · У {round(totals.carbs, 1)}</span>
+            </div>
+          </div>
+          <div className="shrink-0 text-xs font-semibold whitespace-nowrap">{round(totals.kcal)}</div>
+        </button>
       </div>
     </div>
   );
