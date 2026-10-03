@@ -23,15 +23,46 @@ function dropLegacyMacros(profile: Profile): Profile {
   return clean;
 }
 
+/**
+ * Раньше слайдер корректировки создавался разблокированным. При первом чтении
+ * старого профиля фиксируем его, а маркер сохраняет явное решение пользователя
+ * разблокировать слайдер при следующих загрузках.
+ */
+function normalizeProfile(profile: Profile): Profile {
+  const clean = dropLegacyMacros(profile);
+  if (!clean.calorieAdjustLockInitialized) {
+    return { ...clean, calorieAdjustLocked: true, calorieAdjustLockInitialized: true };
+  }
+  return {
+    ...clean,
+    calorieAdjustLocked: clean.calorieAdjustLocked ?? true,
+    calorieAdjustLockInitialized: true,
+  };
+}
+
+/** Нормализация используется и при чтении localStorage, и при импорте резервной копии. */
+export function normalizeState(value: unknown): AppState {
+  const parsed = value && typeof value === "object" && !Array.isArray(value) ? (value as Partial<AppState>) : {};
+  const profile = parsed.profile && typeof parsed.profile === "object" ? normalizeProfile(parsed.profile as Profile) : null;
+  const products = Array.isArray(parsed.products) ? parsed.products : [];
+  const ids = new Set(products.map((product) => product.id));
+
+  return {
+    ...emptyState,
+    ...parsed,
+    profile,
+    products: [...products, ...SEED_PRODUCTS.filter((product) => !ids.has(product.id))],
+    meals: Array.isArray(parsed.meals) ? parsed.meals : [],
+    weights: Array.isArray(parsed.weights) ? parsed.weights : [],
+    recentProductIds: Array.isArray(parsed.recentProductIds) ? parsed.recentProductIds : [],
+  };
+}
+
 export function loadState(): AppState {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return emptyState;
-    const parsed = JSON.parse(raw) as AppState;
-    const ids = new Set(parsed.products?.map((p) => p.id));
-    const merged = [...(parsed.products ?? []), ...SEED_PRODUCTS.filter((p) => !ids.has(p.id))];
-    const profile = parsed.profile ? dropLegacyMacros(parsed.profile) : null;
-    return { ...emptyState, ...parsed, profile, products: merged, recentProductIds: parsed.recentProductIds ?? [] };
+    return normalizeState(JSON.parse(raw));
   } catch {
     return emptyState;
   }

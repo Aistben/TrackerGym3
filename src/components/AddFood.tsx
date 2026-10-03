@@ -41,6 +41,7 @@ export default function AddFood({
   onModeChange?: (mode: "search" | "scan" | "form" | "portion") => void;
 }) {
   const [mode, setMode] = useState<Mode>(startMode);
+  const [openedDirectlyInScanner] = useState(startMode === "scan");
   const [lib, setLib] = useState<Lib>(recentProductIds.length ? "recent" : "base");
   const [q, setQ] = useState("");
   const [picked, setPicked] = useState<Product | null>(null);
@@ -398,7 +399,7 @@ export default function AddFood({
   }
 
   /* ---------- сканер ---------- */
-  if (mode === "scan") return <Scanner onDetect={handleCode} onClose={() => setMode("search")} />;
+  if (mode === "scan") return <Scanner onDetect={handleCode} onClose={() => (openedDirectlyInScanner ? onClose() : setMode("search"))} />;
 
   /* Лист оценки нужен в двух режимах: из поиска и из карточки продукта. */
   const estimateSheet = (
@@ -548,10 +549,9 @@ export default function AddFood({
       <Tabs
         value={lib}
         onChange={setLib}
-        fill={false}
         items={[
           { key: "recent", label: `Недавние${recent.length ? ` · ${recent.length}` : ""}` },
-          { key: "base", label: `База продуктов · ${products.length}` },
+          { key: "base", label: `База · ${products.length}` },
         ]}
       />
 

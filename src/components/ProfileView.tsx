@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { ActivityKey, AppState, Goal, Profile, Sex, Targets } from "../lib/types";
 import { ACTIVITY, GOALS, round } from "../lib/nutrition";
-import { emptyState } from "../lib/storage";
-import { ADJUST_LIMIT, formatAdjust, pushValue, undoTarget } from "../lib/adjust";
+import { emptyState, normalizeState } from "../lib/storage";
+import { formatAdjust, pushValue, undoTarget } from "../lib/adjust";
 import { Btn, Field, Select, Sheet } from "./ui";
 
 export default function ProfileView({
@@ -58,7 +58,7 @@ export default function ProfileView({
   function toggleAdjustLock() {
     window.clearTimeout(dragTimer.current);
     dragging.current = false;
-    patch({ calorieAdjustLocked: !locked });
+    patch({ calorieAdjustLocked: !locked, calorieAdjustLockInitialized: true });
   }
 
   const undoValue = history.length ? history[history.length - 1] : null;
@@ -76,7 +76,7 @@ export default function ProfileView({
     const r = new FileReader();
     r.onload = () => {
       try {
-        setState({ ...emptyState, ...JSON.parse(String(r.result)) });
+        setState(normalizeState(JSON.parse(String(r.result))));
       } catch {
         alert("Не удалось прочитать файл");
       }
@@ -241,15 +241,6 @@ export default function ProfileView({
           </div>
         </Field>
 
-        <p className="text-[11px] leading-snug text-mute">
-          {locked
-            ? "🔒 Слайдер зафиксирован: случайное касание значение не сдвинет. Снимите замок, чтобы снова менять."
-            : "🔓 Замок рядом со слайдером фиксирует значение, чтобы его не сбить случайным касанием."}{" "}
-          {undoValue === null
-            ? "↩ рядом с замком вернёт прежнее значение, если слайдер всё-таки уехал (25 ккал — один шаг)."
-            : `↩ рядом с замком вернёт ${formatAdjust(undoValue)} — история хранит до ${ADJUST_LIMIT} шагов и не теряется при закрытии настроек.`}
-        </p>
-
         <div className="rounded-xl border border-acc2/20 bg-acc2/8 p-3 text-xs leading-relaxed text-mute">
           <span className="font-semibold text-acc2">Как считается БЖУ:</span> белок — по текущему весу (1,8–2,2 г/кг), жиры — 30% калорий, углеводы — оставшиеся калории. Высокая активность или профицит прежде всего увеличивают углеводы. Не хватает калорий или белка — подтяни норму слайдером «Ручная корректировка» выше.
         </div>
@@ -258,15 +249,33 @@ export default function ProfileView({
 
       <div className="card space-y-2 p-4">
         <h3 className="text-sm font-semibold">Данные</h3>
-        <div className="grid grid-cols-3 gap-2">
-          <Btn variant="soft" size="sm" title="Сохранить данные в файл" onClick={exportData}>
-            ⬇️ Сохранить
+        <div className="grid grid-cols-3 gap-1.5">
+          <Btn
+            variant="soft"
+            size="sm"
+            title="Сохранить данные в файл"
+            onClick={exportData}
+            className="min-w-0 min-h-9 whitespace-nowrap !gap-1 !px-1 !py-2 text-[11px] leading-none max-[360px]:text-[10px]"
+          >
+            Сохранить
           </Btn>
-          <Btn variant="soft" size="sm" title="Загрузить данные из файла" onClick={() => fileRef.current?.click()}>
-            ⬆️ Загрузить
+          <Btn
+            variant="soft"
+            size="sm"
+            title="Загрузить данные из файла"
+            onClick={() => fileRef.current?.click()}
+            className="min-w-0 min-h-9 whitespace-nowrap !gap-1 !px-1 !py-2 text-[11px] leading-none max-[360px]:text-[10px]"
+          >
+            Загрузить
           </Btn>
-          <Btn variant="danger" size="sm" title="Сбросить все данные" onClick={() => setResetOpen(true)}>
-            🗑 Сбросить
+          <Btn
+            variant="danger"
+            size="sm"
+            title="Сбросить все данные"
+            onClick={() => setResetOpen(true)}
+            className="min-w-0 min-h-9 whitespace-nowrap !gap-1 !px-1 !py-2 text-[11px] leading-none max-[360px]:text-[10px]"
+          >
+            Сбросить
           </Btn>
         </div>
         <input

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 export function Sheet({
   open,
@@ -203,16 +204,22 @@ export function Select<T extends string | number>({
   function place() {
     const r = buttonRef.current?.getBoundingClientRect();
     if (!r) return;
-    const below = window.innerHeight - r.bottom - 12;
-    const above = r.top - 12;
-    const openUp = below < 220 && above > below;
+    const gutter = 8;
+    const footerTop = document.querySelector<HTMLElement>("[data-bottom-nav]")?.getBoundingClientRect().top ?? window.innerHeight;
+    const below = Math.max(0, Math.min(window.innerHeight, footerTop) - r.bottom - gutter);
+    const above = Math.max(0, r.top - gutter);
+    const desiredHeight = Math.min(320, options.length * 60 + 8);
+    const openUp = below < desiredHeight && above > below;
+    const width = Math.min(r.width, window.innerWidth - gutter * 2);
+    const left = Math.max(gutter, Math.min(r.left, window.innerWidth - width - gutter));
+    const available = openUp ? above : below;
     setRect({
       top: r.bottom + 6,
       bottom: window.innerHeight - r.top + 6,
-      left: r.left,
-      width: r.width,
+      left,
+      width,
       above: openUp,
-      maxHeight: Math.max(140, Math.min(320, openUp ? above : below)),
+      maxHeight: Math.max(96, Math.min(320, available)),
     });
   }
 
@@ -265,46 +272,50 @@ export function Select<T extends string | number>({
         <span className={`shrink-0 text-xs text-mute transition ${open ? "rotate-180" : ""}`}>▼</span>
       </button>
 
-      {open && rect && (
-        <div
-          ref={listRef}
-          role="listbox"
-          style={{
-            position: "fixed",
-            left: rect.left,
-            width: rect.width,
-            maxHeight: rect.maxHeight,
-            top: rect.above ? undefined : rect.top,
-            bottom: rect.above ? rect.bottom : undefined,
-          }}
-          className="z-[70] overflow-y-auto overscroll-contain rounded-xl border border-line bg-[#241a40] p-1 shadow-2xl shadow-black/60"
-        >
-          {options.map((option) => {
-            const selected = option.key === value;
-            return (
-              <button
-                key={option.key}
-                role="option"
-                aria-selected={selected}
-                onClick={() => {
-                  onChange(option.key);
-                  setOpen(false);
-                }}
-                className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left transition ${
-                  selected ? "bg-acc/20" : "hover:bg-white/5"
-                }`}
-              >
-                {option.emoji && <span className="shrink-0 text-base leading-none">{option.emoji}</span>}
-                <span className="min-w-0 flex-1">
-                  <span className={`block text-sm leading-snug font-medium ${selected ? "text-acc" : ""}`}>{option.label}</span>
-                  {option.hint && <span className="mt-0.5 block text-[11px] leading-snug text-mute">{option.hint}</span>}
-                </span>
-                {selected && <span className="shrink-0 text-xs text-acc">✓</span>}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {open && rect &&
+        createPortal(
+          <div
+            ref={listRef}
+            role="listbox"
+            style={{
+              position: "fixed",
+              zIndex: 80,
+              left: rect.left,
+              width: rect.width,
+              maxHeight: rect.maxHeight,
+              top: rect.above ? undefined : rect.top,
+              bottom: rect.above ? rect.bottom : undefined,
+            }}
+            className="overflow-y-auto overscroll-contain rounded-xl border border-line bg-[#241a40] p-1 shadow-2xl shadow-black/60"
+          >
+            {options.map((option) => {
+              const selected = option.key === value;
+              return (
+                <button
+                  type="button"
+                  key={option.key}
+                  role="option"
+                  aria-selected={selected}
+                  onClick={() => {
+                    onChange(option.key);
+                    setOpen(false);
+                  }}
+                  className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left transition ${
+                    selected ? "bg-acc/20" : "hover:bg-white/5"
+                  }`}
+                >
+                  {option.emoji && <span className="shrink-0 text-base leading-none">{option.emoji}</span>}
+                  <span className="min-w-0 flex-1">
+                    <span className={`block text-sm leading-snug font-medium ${selected ? "text-acc" : ""}`}>{option.label}</span>
+                    {option.hint && <span className="mt-0.5 block text-[11px] leading-snug text-mute">{option.hint}</span>}
+                  </span>
+                  {selected && <span className="shrink-0 text-xs text-acc">✓</span>}
+                </button>
+              );
+            })}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
