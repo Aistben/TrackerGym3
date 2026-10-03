@@ -51,6 +51,8 @@ test("pickProductCode: выбирает код товара среди проч�
     "4600494561238",
   );
   assert.equal(pickProductCode([{ rawValue: "010460049456123821ABC", format: "data_matrix" }]), "4600494561238");
+  // GTIN-14 из маркировки этого зефира нормализуется к EAN-13 в локальной базе.
+  assert.equal(pickProductCode([{ rawValue: "010468032804768821ABC123", format: "data_matrix" }]), "4680328047688");
   // UPC-A разворачивается и приводится к EAN-13 — как и все остальные коды в приложении.
   assert.equal(pickProductCode([{ rawValue: "01234565", format: "upc_e" }]), "0012345000065");
   assert.equal(pickProductCode([{ rawValue: "01234565", format: BarcodeFormat.UPC_E }]), "0012345000065");

@@ -12,6 +12,7 @@ function validEan13(code: string): boolean {
 }
 
 test("база непустая и без дублей названий у одного бренда", () => {
+  assert.equal(SEED_PRODUCTS.length, 229);
   assert.ok(SEED_PRODUCTS.length >= 130, `продуктов в базе: ${SEED_PRODUCTS.length}`);
   const seen = new Set<string>();
   for (const product of SEED_PRODUCTS) {
@@ -47,12 +48,22 @@ test("продукты из «Магнита» лежат в конце базы
   assert.equal(first.brand, "Простоквашино");
 
   const magnetBrands = new Set(["Махеевъ", "Heinz", "Слобода", "Astoria", "Mr. Ricco", "Pikador"]);
-  const tail = SEED_PRODUCTS.slice(-15);
-  assert.equal(tail.length, 15);
+  const sauces = SEED_PRODUCTS.slice(-16, -1);
+  assert.equal(sauces.length, 15);
   assert.ok(
-    tail.every((product) => magnetBrands.has(product.brand ?? "")),
-    tail.map((product) => `${product.brand} ${product.name}`).join(" | "),
+    sauces.every((product) => magnetBrands.has(product.brand ?? "")),
+    sauces.map((product) => `${product.brand} ${product.name}`).join(" | "),
   );
+
+  const zephyr = SEED_PRODUCTS.at(-1)!;
+  assert.equal(zephyr.id, "brand-163");
+  assert.equal(zephyr.name, "Зефир «Бело-розовый» с ароматом ванили и малины");
+  assert.equal(zephyr.brand, "Сокол");
+  assert.equal(zephyr.barcode, "4680328047688");
+  assert.equal(zephyr.kcal, 320);
+  assert.equal(zephyr.protein, 0.8);
+  assert.equal(zephyr.fat, 0);
+  assert.equal(zephyr.carbs, 80.4);
 });
 
 test("новая версия базы докатывается к сохранённым данным без потерь", () => {
@@ -82,4 +93,6 @@ test("новая версия базы докатывается к сохран�
     1,
     "новинка задвоилась при слиянии с сохранённой базой",
   );
+  assert.ok(merged.products.some((product) => product.barcode === "4680328047688"), "зефир из обновления не доехал до сохранённой базы");
+  assert.equal(merged.products.filter((product) => product.barcode === "4680328047688").length, 1);
 });

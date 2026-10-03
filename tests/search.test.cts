@@ -51,6 +51,13 @@ test("штрихкод из базы находится и без интерне
   assert.equal(searchProducts(SEED_PRODUCTS, "460 4248 018276", 5).items[0]?.id, magnet.id);
 });
 
+test("зефир Сокол находится по названию и коду маркировки", () => {
+  const zephyr = SEED_PRODUCTS.find((product) => product.barcode === "4680328047688")!;
+  assert.ok(zephyr);
+  assert.equal(searchProducts(SEED_PRODUCTS, "зефир бело-розовый ароматом ванили малины").items[0]?.id, zephyr.id);
+  assert.equal(searchProducts(SEED_PRODUCTS, "4680328047688").items[0]?.id, zephyr.id);
+});
+
 test("опечатка и перестановка букв находят соус", () => {
   // Неполное слово — это ещё строгое совпадение (префикс).
   const partial = searchProducts(SEED_PRODUCTS, "махеев сырны соус");
