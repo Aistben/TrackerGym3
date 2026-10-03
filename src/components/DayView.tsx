@@ -33,6 +33,10 @@ export default function DayView({
   const [editEntry, setEditEntry] = useState<EntryAction | null>(null);
   const [moveEntry, setMoveEntry] = useState<EntryAction | null>(null);
   const [deleteMeal, setDeleteMeal] = useState<Meal | null>(null);
+  /** Меню «⋮» на карточке приёма: дублирование и удаление */
+  const [mealMenu, setMealMenu] = useState<Meal | null>(null);
+  /** Продукт, который свайпом попросили удалить — ждём подтверждения */
+  const [pendingDelete, setPendingDelete] = useState<EntryAction | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ mealId: string; entryId: string; grams: number } | null>(null);
@@ -68,7 +72,9 @@ export default function DayView({
     };
   }, [baseTotals, draftPreview]);
   const left = Math.max(0, targets.calories - totals.kcal);
-  const hasOverlay = !!(addTo || newMeal || timePick || editEntry || moveEntry || deleteMeal || calendarOpen);
+  const hasOverlay = !!(
+    addTo || newMeal || timePick || editEntry || moveEntry || deleteMeal || calendarOpen || mealMenu || pendingDelete
+  );
 
   const handlePortionPreview = useCallback(
     (preview: { product: Product; grams: number } | null) => setDraftPreview(preview),
@@ -304,19 +310,11 @@ export default function DayView({
                   <span className="whitespace-nowrap text-acc">· У {round(t.carbs)}</span>
                 </div>
               </div>
-              <IconBtn onClick={() => copyMeal(meal, shiftDate(date, 1))} title="Копия на завтра" size={28}>
-                <span className="block -translate-y-px text-[13px] leading-none">→</span>
-              </IconBtn>
-              <IconBtn onClick={() => copyMeal(meal, date)} title="Дублировать приём" size={28}>
-                <span className="block -translate-y-px text-[13px] leading-none">↗</span>
-              </IconBtn>
-              <IconBtn
-                onClick={() => setDeleteMeal(meal)}
-                title="Удалить приём"
-                size={28}
-                className="border-bad/40 text-bad hover:text-bad"
-              >
-                <span className="block -translate-y-px text-[13px] leading-none">×</span>
+              {/* Одна кнопка «⋮» вместо трёх значков: дублирование и удаление
+                  приёма живут в меню действий, копирования всей карточки на
+                  завтра здесь больше нет. */}
+              <IconBtn onClick={() => setMealMenu(meal)} title="Действия с приёмом" size={28}>
+                <span className="block -translate-y-[3px] text-[15px] leading-none">⋮</span>
               </IconBtn>
             </div>
 
@@ -334,16 +332,7 @@ export default function DayView({
                       setSwipedId(null);
                       setMoveEntry(action);
                     }}
-                    onDelete={() => {
-                      try {
-                        navigator.vibrate?.(40);
-                      } catch {
-                        /* noop */
-                      }
-                      removeEntry(meal.id, entry.id);
-                      setSwipedId(null);
-                      notify("Продукт удалён");
-                    }}
+                    onDelete={() => setPendingDelete(action)}
                   />
                 );
               })}
@@ -455,6 +444,73 @@ export default function DayView({
             meals={meals}
             onMove={(targetId) => moveEntryTo(moveEntry, targetId)}
           />
+        )}
+      </Sheet>
+
+      {/* Меню «⋮» на карточке приёма: пункты вместо трёх значков в шапке */}
+      <Sheet open={!!mealMenu} onClose={() => setMealMenu(null)} title="Приём пищи" center compact>
+        {mealMenu && (
+          <div className="space-y-2">
+            <div className="rounded-xl border border-line bg-panel2/60 px-3 py-2 text-xs leading-snug text-mute">
+              {mealMenu.time} · {mealTitle(mealMenu.title)} · продуктов: {mealMenu.entries.length} · {round(sumTotals(mealMenu.entries).kcal)} ккал
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                copyMeal(mealMenu, date);
+                setMealMenu(null);
+              }}
+              className="flex w-full items-center gap-3 rounded-xl border border-line bg-panel2 px-3 py-3 text-left text-sm font-medium transition hover:border-acc2/50 active:scale-[0.99]"
+            >
+              <span className="shrink-0 text-base leading-none">↗</span>
+              Дублировать приём
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteMeal(mealMenu);
+                setMealMenu(null);
+              }}
+              className="flex w-full items-center gap-3 rounded-xl border border-bad/35 bg-bad/10 px-3 py-3 text-left text-sm font-medium text-bad transition hover:bg-bad/20 active:scale-[0.99]"
+            >
+              <span className="shrink-0 text-base leading-none">🗑</span>
+              Удалить приём
+            </button>
+          </div>
+        )}
+      </Sheet>
+
+      {/* Подтверждение удаления продукта: свайп влево открывает «Удалить»,
+          но продукт уходит только после подтверждения — свайп случайный. */}
+      <Sheet open={!!pendingDelete} onClose={() => setPendingDelete(null)} title="Удалить продукт?" center>
+        {pendingDelete && (
+          <div className="space-y-4">
+            <p className="text-sm leading-relaxed text-mute">
+              Убрать «{pendingDelete.entry.name}» ({round(pendingDelete.entry.grams)} г) из приёма «
+              {mealTitle(pendingDelete.mealTitle)}»?
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Btn variant="soft" onClick={() => setPendingDelete(null)}>
+                Нет
+              </Btn>
+              <Btn
+                variant="danger"
+                onClick={() => {
+                  try {
+                    navigator.vibrate?.(40);
+                  } catch {
+                    /* noop */
+                  }
+                  removeEntry(pendingDelete.mealId, pendingDelete.entry.id);
+                  setPendingDelete(null);
+                  setSwipedId(null);
+                  notify("Продукт удалён");
+                }}
+              >
+                Да, удалить
+              </Btn>
+            </div>
+          </div>
         )}
       </Sheet>
 
