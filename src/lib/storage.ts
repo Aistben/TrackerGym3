@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import type { AppState, Profile } from "./types";
 import { SEED_PRODUCTS } from "./seed";
+import { pruneBasket, sanitizeBasket } from "./basket";
+import { today } from "./nutrition";
 
 const KEY = "nutri-tracker-v1";
 
@@ -10,6 +12,7 @@ export const emptyState: AppState = {
   meals: [],
   weights: [],
   recentProductIds: [],
+  basket: [],
 };
 
 /**
@@ -55,6 +58,9 @@ export function normalizeState(value: unknown): AppState {
     meals: Array.isArray(parsed.meals) ? parsed.meals : [],
     weights: Array.isArray(parsed.weights) ? parsed.weights : [],
     recentProductIds: Array.isArray(parsed.recentProductIds) ? parsed.recentProductIds : [],
+    // Корзина: и из localStorage, и из бэкапа берём только корректные позиции,
+    // а неразобранное за месяц выбрасываем — чтобы список не пух вечно.
+    basket: pruneBasket(sanitizeBasket(parsed.basket), today()),
   };
 }
 

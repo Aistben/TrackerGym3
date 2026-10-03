@@ -2,6 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AppState, Meal, MealEntry, Product, Targets } from "../lib/types";
 import { dayTotals, entryTotals, humanDate, round, shiftDate, sumTotals, today } from "../lib/nutrition";
 import { uid } from "../lib/storage";
+import {
+  addBasketItem,
+  basketEntryForMeal,
+  basketForDate,
+  makeBasketItem,
+  removeBasketItem,
+} from "../lib/basket";
+import type { BasketItem } from "../lib/types";
 import { sameBarcode } from "../lib/barcode";
 import { Bar, Btn, Empty, Field, IconBtn, Ring, Sheet, noSuggest, numField } from "./ui";
 import AddFood from "./AddFood";
@@ -33,10 +41,23 @@ export default function DayView({
   const [editEntry, setEditEntry] = useState<EntryAction | null>(null);
   const [moveEntry, setMoveEntry] = useState<EntryAction | null>(null);
   const [deleteMeal, setDeleteMeal] = useState<Meal | null>(null);
+  /** Меню «⋮» на карточке приёма: дублирование и удаление */
+  const [mealMenu, setMealMenu] = useState<Meal | null>(null);
+  /** Продукт, который свайпом попросили удалить — ждём подтверждения */
+  const [pendingDelete, setPendingDelete] = useState<EntryAction | null>(null);
+  /** Корзина дня открыта: продукты, перенесённые на этот день, ждут раскладки */
+  const [basketOpen, setBasketOpen] = useState(false);
+  /** Продукт, который сейчас тащат пальцем из корзины (и где палец) */
+  const [carry, setCarry] = useState<{ item: BasketItem; x: number; y: number } | null>(null);
+  /** Карточка приёма под пальцем — подсвечиваем её как цель переноса */
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const carryRef = useRef<{ item: BasketItem; x: number; y: number } | null>(null);
+  carryRef.current = carry;
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ mealId: string; entryId: string; grams: number } | null>(null);
-  const [swipedId, setSwipedId] = useState<string | null>(null);
+  /** Открытая свайпом строка продукта: id и сторона */
+  const [swiped, setSwiped] = useState<{ id: string; side: SwipeSide } | null>(null);
   const [tempMealId, setTempMealId] = useState<string | null>(null);
   const [draftPreview, setDraftPreview] = useState<{ product: Product; grams: number } | null>(null);
   const [addStep, setAddStep] = useState<"search" | "scan" | "form" | "portion">("search");
@@ -68,7 +89,19 @@ export default function DayView({
     };
   }, [baseTotals, draftPreview]);
   const left = Math.max(0, targets.calories - totals.kcal);
-  const hasOverlay = !!(addTo || newMeal || timePick || editEntry || moveEntry || deleteMeal || calendarOpen);
+  const hasOverlay = !!(
+    addTo ||
+    newMeal ||
+    timePick ||
+    editEntry ||
+    moveEntry ||
+    deleteMeal ||
+    calendarOpen ||
+    mealMenu ||
+    pendingDelete ||
+    basketOpen ||
+    carry
+  );
 
   const handlePortionPreview = useCallback(
     (preview: { product: Product; grams: number } | null) => setDraftPreview(preview),
@@ -166,6 +199,32 @@ export default function DayView({
     notify(`Продукт перенесён в ${targetMeal ? mealTitle(targetMeal.title) : "другой приём"}`);
   }
 
+  /** Продукты, перенесённые на просматриваемый день и ещё не разложенные */
+  const basketItems = useMemo(() => basketForDate(state.basket, date), [state.basket, date]);
+
+  /** Свайп вправо по продукту — копия уходит в корзину следующего дня. */
+  function copyEntryToNextDay(action: EntryAction) {
+    const target = shiftDate(date, 1);
+    setState((s) => ({
+      ...s,
+      basket: addBasketItem(s.basket, makeBasketItem(action.entry, target, uid(), Date.now())),
+    }));
+    notify(`Копия — в корзине на ${humanDate(target).toLowerCase()}`);
+  }
+
+  /** Продукт из корзины перетащили в карточку приёма. */
+  function dropBasketItem(item: BasketItem, mealId: string) {
+    const meal = meals.find((m) => m.id === mealId);
+    if (!meal) return;
+    update((ms) =>
+      ms.map((m) => (m.id === mealId ? { ...m, entries: [...m.entries, basketEntryForMeal(item, uid())] } : m)),
+    );
+    setState((s) => ({ ...s, basket: removeBasketItem(s.basket, item.id) }));
+    notify(`Добавлено в «${mealTitle(meal.title)}»`);
+  }
+
+  const carryEntry = carry?.item.entry ?? null;
+
   function copyMeal(meal: Meal, targetDate: string) {
     update((ms) => {
       const clone: Meal = {
@@ -178,6 +237,50 @@ export default function DayView({
     });
     notify(targetDate === meal.date ? "Приём продублирован" : `Копия сохранена на ${humanDate(targetDate).toLowerCase()}`);
   }
+
+  // Перетаскивание из корзины в приём. Слушаем окно целиком: палец ведёт
+  // продукт, а мы ищем карточку приёма под ним. Скролл на время переноса
+  // гасим — иначе на телефоне жест уходит в прокрутку и перенос обрывается.
+  useEffect(() => {
+    if (!carry) return;
+    const mealUnder = (x: number, y: number) =>
+      document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-meal-id]")?.dataset.mealId ?? null;
+    const move = (event: PointerEvent) => {
+      const { clientX: x, clientY: y } = event;
+      setCarry((current) => (current ? { ...current, x, y } : current));
+      setDropTarget(mealUnder(x, y));
+      // Автопрокрутка у краёв экрана: длинный день можно «долистать» пальцем
+      if (y < 150) window.scrollBy(0, -14);
+      else if (y > window.innerHeight - 170) window.scrollBy(0, 14);
+    };
+    const finish = (event: PointerEvent) => {
+      const item = carryRef.current?.item;
+      const mealId = mealUnder(event.clientX, event.clientY);
+      if (item && mealId) dropBasketItem(item, mealId);
+      setCarry(null);
+      setDropTarget(null);
+    };
+    const cancel = () => {
+      setCarry(null);
+      setDropTarget(null);
+    };
+    const blockScroll = (event: TouchEvent) => event.preventDefault();
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", cancel);
+    window.addEventListener("touchmove", blockScroll, { passive: false });
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", cancel);
+      window.removeEventListener("touchmove", blockScroll);
+    };
+  }, [!!carry]);
+
+  // При смене дня корзина закрывается: у нового дня свои продукты
+  useEffect(() => {
+    setBasketOpen(false);
+  }, [date]);
 
   function openCalendar() {
     setCalendarOpen(true);
@@ -203,13 +306,13 @@ export default function DayView({
   }
 
   function openEntry(action: EntryAction) {
-    setSwipedId(null);
+    setSwiped(null);
     setEditEntry(action);
   }
 
   return (
     <div className="space-y-4 pb-32" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} onTouchCancel={() => { touchStart.current = null; }}>
-      <div className="flex items-center gap-2">
+      <div className="mb-2 flex items-center gap-2">
         <IconBtn onClick={() => setDate(shiftDate(date, -1))} title="Предыдущий день" size={40}>
           ‹
         </IconBtn>
@@ -232,9 +335,8 @@ export default function DayView({
           </Btn>
         )}
       </div>
-      <div className="text-center text-[11px] text-mute">Свайп влево или вправо — другой день</div>
 
-      <div className="sticky top-0 z-40 pt-1 pb-2">
+      <div className="sticky top-0 z-40 mb-2 pt-1 pb-2">
       <div
         className="card flex items-center gap-4 p-4"
         style={{ background: "linear-gradient(145deg, #30235a, #241a40)" }}
@@ -284,7 +386,13 @@ export default function DayView({
       {visibleMeals.map((meal) => {
         const t = sumTotals(meal.entries);
         return (
-          <div key={meal.id} className="card rise overflow-hidden">
+          <div
+            key={meal.id}
+            data-meal-id={meal.id}
+            className={`card rise overflow-hidden transition ${
+              dropTarget === meal.id ? "ring-2 ring-acc2 shadow-[0_0_0_4px_rgb(45_212_191_/_0.18)]" : ""
+            }`}
+          >
             <div className="flex items-center gap-1.5 border-b border-line px-3 py-2.5">
               <button
                 type="button"
@@ -305,19 +413,11 @@ export default function DayView({
                   <span className="whitespace-nowrap text-acc">· У {round(t.carbs)}</span>
                 </div>
               </div>
-              <IconBtn onClick={() => copyMeal(meal, shiftDate(date, 1))} title="Копия на завтра" size={28}>
-                <span className="block -translate-y-px text-[13px] leading-none">→</span>
-              </IconBtn>
-              <IconBtn onClick={() => copyMeal(meal, date)} title="Дублировать приём" size={28}>
-                <span className="block -translate-y-px text-[13px] leading-none">↗</span>
-              </IconBtn>
-              <IconBtn
-                onClick={() => setDeleteMeal(meal)}
-                title="Удалить приём"
-                size={28}
-                className="border-bad/40 text-bad hover:text-bad"
-              >
-                <span className="block -translate-y-px text-[13px] leading-none">×</span>
+              {/* Одна кнопка «⋮» вместо трёх значков: дублирование и удаление
+                  приёма живут в меню действий, копирования всей карточки на
+                  завтра здесь больше нет. */}
+              <IconBtn onClick={() => setMealMenu(meal)} title="Действия с приёмом" size={28}>
+                <span className="block -translate-y-[3px] text-[15px] leading-none">⋮</span>
               </IconBtn>
             </div>
 
@@ -328,22 +428,20 @@ export default function DayView({
                   <EntryRow
                     key={entry.id}
                     entry={entry}
-                    swiped={swipedId === entry.id}
-                    onSwipe={(open) => setSwipedId(open ? entry.id : null)}
+                    swiped={swiped?.id === entry.id ? swiped.side : null}
+                    onSwipe={(side) => setSwiped(side ? { id: entry.id, side } : null)}
                     onTap={() => openEntry(action)}
                     onLongPress={() => {
-                      setSwipedId(null);
+                      setSwiped(null);
                       setMoveEntry(action);
                     }}
                     onDelete={() => {
-                      try {
-                        navigator.vibrate?.(40);
-                      } catch {
-                        /* noop */
-                      }
-                      removeEntry(meal.id, entry.id);
-                      setSwipedId(null);
-                      notify("Продукт удалён");
+                      setSwiped(null);
+                      setPendingDelete(action);
+                    }}
+                    onTomorrow={() => {
+                      setSwiped(null);
+                      copyEntryToNextDay(action);
                     }}
                   />
                 );
@@ -459,6 +557,84 @@ export default function DayView({
         )}
       </Sheet>
 
+      {/* Меню «⋮» на карточке приёма: пункты вместо трёх значков в шапке */}
+      <Sheet open={!!mealMenu} onClose={() => setMealMenu(null)} title="Приём пищи" center compact>
+        {mealMenu && (
+          <div className="space-y-2">
+            <div className="rounded-xl border border-line bg-panel2/60 px-3 py-2 text-xs leading-snug text-mute">
+              {mealMenu.time} · {mealTitle(mealMenu.title)} · продуктов: {mealMenu.entries.length} · {round(sumTotals(mealMenu.entries).kcal)} ккал
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                copyMeal(mealMenu, date);
+                setMealMenu(null);
+              }}
+              className="flex w-full items-center gap-3 rounded-xl border border-line bg-panel2 px-3 py-3 text-left text-sm font-medium transition hover:border-acc2/50 active:scale-[0.99]"
+            >
+              <span className="shrink-0 text-base leading-none">↗</span>
+              Дублировать приём
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                copyMeal(mealMenu, shiftDate(date, 1));
+                setMealMenu(null);
+              }}
+              className="flex w-full items-center gap-3 rounded-xl border border-line bg-panel2 px-3 py-3 text-left text-sm font-medium transition hover:border-acc2/50 active:scale-[0.99]"
+            >
+              <span className="shrink-0 text-base leading-none">→</span>
+              Скопировать приём на завтра
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteMeal(mealMenu);
+                setMealMenu(null);
+              }}
+              className="flex w-full items-center gap-3 rounded-xl border border-bad/35 bg-bad/10 px-3 py-3 text-left text-sm font-medium text-bad transition hover:bg-bad/20 active:scale-[0.99]"
+            >
+              <span className="shrink-0 text-base leading-none">🗑</span>
+              Удалить приём
+            </button>
+          </div>
+        )}
+      </Sheet>
+
+      {/* Подтверждение удаления продукта: свайп влево открывает «Удалить»,
+          но продукт уходит только после подтверждения — свайп случайный. */}
+      <Sheet open={!!pendingDelete} onClose={() => setPendingDelete(null)} title="Удалить продукт?" center>
+        {pendingDelete && (
+          <div className="space-y-4">
+            <p className="text-sm leading-relaxed text-mute">
+              Убрать «{pendingDelete.entry.name}» ({round(pendingDelete.entry.grams)} г) из приёма «
+              {mealTitle(pendingDelete.mealTitle)}»?
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Btn variant="soft" onClick={() => setPendingDelete(null)}>
+                Нет
+              </Btn>
+              <Btn
+                variant="danger"
+                onClick={() => {
+                  try {
+                    navigator.vibrate?.(40);
+                  } catch {
+                    /* noop */
+                  }
+                  removeEntry(pendingDelete.mealId, pendingDelete.entry.id);
+                  setPendingDelete(null);
+                  setSwiped(null);
+                  notify("Продукт удалён");
+                }}
+              >
+                Да, удалить
+              </Btn>
+            </div>
+          </div>
+        )}
+      </Sheet>
+
       <Sheet open={!!deleteMeal} onClose={() => setDeleteMeal(null)} title="Удалить приём?" center>
         {deleteMeal && (
           <div className="space-y-4">
@@ -497,6 +673,97 @@ export default function DayView({
           }}
         />
       </Sheet>
+
+      {/* Корзина дня: продукты, перенесённые на этот день свайпом. Появляется
+          только когда в ней что-то есть; кнопка — над «Сканировать». */}
+      {basketItems.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setBasketOpen((open) => !open)}
+          title="Корзина дня: перенесённые продукты"
+          aria-label={`Корзина дня: продуктов ${basketItems.length}`}
+          aria-expanded={basketOpen}
+          className={`fixed z-[45] grid size-12 place-items-center rounded-full border bg-[rgb(24_16_44/.95)] text-xl shadow-xl shadow-black/50 backdrop-blur-xl transition active:scale-95 ${
+            basketOpen ? "border-acc2 text-acc2" : "border-acc2/40"
+          }`}
+          style={{
+            right: "max(1rem, calc((100vw - 32rem) / 2 + 1rem))",
+            bottom: "calc(5.75rem + var(--safe-bottom) + 3.75rem)",
+          }}
+        >
+          🧺
+          <span className="absolute -top-1 -right-1 grid min-w-5 place-items-center rounded-full bg-acc2 px-1 text-[10px] font-bold text-[#0b2b28]">
+            {basketItems.length}
+          </span>
+        </button>
+      )}
+
+      {basketOpen && basketItems.length > 0 && (
+        <div
+          data-no-swipe
+          className="fixed z-[46] overflow-hidden rounded-2xl border border-line shadow-2xl shadow-black/70"
+          style={{
+            right: "max(1rem, calc((100vw - 32rem) / 2 + 1rem))",
+            bottom: "calc(5.75rem + var(--safe-bottom) + 6.5rem)",
+            width: "min(21rem, calc(100vw - 2rem))",
+            background: "#241a40",
+            // На время переноса прячем панель: палец должен «видеть» все карточки
+            opacity: carry ? 0 : 1,
+            pointerEvents: carry ? "none" : undefined,
+          }}
+        >
+          <div className="flex items-center gap-2 border-b border-line px-3 py-2">
+            <span className="text-base leading-none">🧺</span>
+            <span className="min-w-0 flex-1 text-xs font-semibold">
+              Корзина на {humanDate(date).toLowerCase()}
+            </span>
+            <button
+              type="button"
+              onClick={() => setBasketOpen(false)}
+              aria-label="Закрыть корзину"
+              className="grid size-7 shrink-0 place-items-center rounded-full bg-panel2 text-mute transition hover:text-ink active:scale-90"
+            >
+              ✕
+            </button>
+          </div>
+          <p className="px-3 pt-2 text-[11px] leading-snug text-mute">
+            Зажми продукт пальцем и перетащи в нужную карточку приёма. В калории дня они попадут, только когда окажутся
+            в приёме.
+          </p>
+          <div className="max-h-[38vh] overflow-y-auto overscroll-contain p-2">
+            {basketItems.map((item) => (
+              <BasketCard key={item.id} item={item} onPickUp={(picked, x, y) => setCarry({ item: picked, x, y })} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* «Призрак» продукта под пальцем при переносе из корзины */}
+      {carry && carryEntry && (
+        <div
+          className="pointer-events-none fixed z-[85] flex max-w-[16rem] -translate-x-1/2 -translate-y-[135%] items-center gap-2 rounded-xl border border-acc2/70 bg-[#241a40] px-3 py-2 shadow-2xl shadow-black/70"
+          style={{ left: carry.x, top: carry.y }}
+        >
+          <span className="shrink-0 text-base leading-none">📥</span>
+          <span className="min-w-0">
+            <span className="block truncate text-xs font-semibold">{carryEntry.name}</span>
+            <span className="block text-[10px] whitespace-nowrap text-mute">
+              {round(carryEntry.grams)} г · {round(entryTotals(carryEntry).kcal)} ккал
+            </span>
+          </span>
+        </div>
+      )}
+
+      {carry && (
+        <div
+          className="pointer-events-none fixed inset-x-0 z-[44] flex justify-center px-4"
+          style={{ bottom: "calc(5.75rem + var(--safe-bottom))" }}
+        >
+          <span className="rounded-full border border-acc2/50 bg-[rgb(24_16_44/.95)] px-3 py-1.5 text-[11px] font-semibold text-acc2 shadow-lg shadow-black/40 backdrop-blur-xl">
+            {dropTarget ? "Отпусти — продукт встанет в этот приём" : "Веди продукт к карточке приёма"}
+          </span>
+        </div>
+      )}
 
       {notice && <CenterNotice message={notice} />}
     </div>
@@ -589,13 +856,83 @@ function EntryEditor({
   );
 }
 
-/** Ширина красной зоны удаления при свайпе, px */
+/**
+ * Продукт в корзине дня. Зажал пальцем (≈0.2 с) — начинается перенос:
+ * дальше палец ведёт карточку, а приём под пальцем подсвечивается.
+ * Сдвинул палец раньше удержания — это прокрутка списка, перенос не стартует.
+ */
+function BasketCard({
+  item,
+  onPickUp,
+}: {
+  item: BasketItem;
+  onPickUp: (item: BasketItem, x: number, y: number) => void;
+}) {
+  const totals = entryTotals(item.entry);
+  const hold = useRef<number | null>(null);
+  const start = useRef<{ x: number; y: number } | null>(null);
+
+  function cancelHold() {
+    if (hold.current !== null) window.clearTimeout(hold.current);
+    hold.current = null;
+    start.current = null;
+  }
+
+  useEffect(() => cancelHold, []);
+
+  return (
+    <div
+      onPointerDown={(event) => {
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        cancelHold();
+        const { clientX, clientY } = event;
+        start.current = { x: clientX, y: clientY };
+        hold.current = window.setTimeout(() => {
+          hold.current = null;
+          try {
+            navigator.vibrate?.(25);
+          } catch {
+            /* noop */
+          }
+          onPickUp(item, clientX, clientY);
+        }, 200);
+      }}
+      onPointerMove={(event) => {
+        const from = start.current;
+        if (hold.current === null || !from) return;
+        if (Math.abs(event.clientX - from.x) > 12 || Math.abs(event.clientY - from.y) > 12) cancelHold();
+      }}
+      onPointerUp={cancelHold}
+      onPointerCancel={cancelHold}
+      style={{ touchAction: "pan-y" }}
+      className="mb-1.5 flex cursor-grab items-center gap-2 rounded-xl border border-line bg-panel2 px-2.5 py-2 last:mb-0 select-none active:border-acc2/60"
+    >
+      <span className="shrink-0 text-sm leading-none text-mute">⠿</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm leading-snug break-words">{item.entry.name}</span>
+        <span className="mt-0.5 block text-[10px] leading-snug text-mute">
+          {round(item.entry.grams)} г · Б {round(totals.protein, 1)} · Ж {round(totals.fat, 1)} · У{" "}
+          {round(totals.carbs, 1)}
+        </span>
+      </span>
+      <span className="shrink-0 text-xs font-semibold whitespace-nowrap">
+        {round(totals.kcal)} <span className="text-[10px] font-medium text-mute">ккал</span>
+      </span>
+    </div>
+  );
+}
+
+/** Ширина зоны действия при свайпе (справа — удалить, слева — на завтра), px */
 const SWIPE_W = 88;
+
+/** Какая сторона строки открыта свайпом: слева — «На завтра», справа — «Удалить» */
+type SwipeSide = "left" | "right";
 
 /**
  * Строка продукта в приёме:
  * тап — изменить граммы, долгий тап — перенос в другой приём,
- * свайп влево — открыть кнопку удаления (вместо крошечного ×).
+ * свайп влево — удалить (с подтверждением),
+ * свайп вправо — копия на следующий день в корзину.
  */
 function EntryRow({
   entry,
@@ -604,13 +941,15 @@ function EntryRow({
   onTap,
   onLongPress,
   onDelete,
+  onTomorrow,
 }: {
   entry: MealEntry;
-  swiped: boolean;
-  onSwipe: (open: boolean) => void;
+  swiped: SwipeSide | null;
+  onSwipe: (side: SwipeSide | null) => void;
   onTap: () => void;
   onLongPress: () => void;
   onDelete: () => void;
+  onTomorrow: () => void;
 }) {
   const totals = entryTotals(entry);
   const [dx, setDx] = useState(0);
@@ -619,9 +958,10 @@ function EntryRow({
   const longPressed = useRef(false);
   const suppressClick = useRef(false);
 
-  // Открыли другую строку (или что-то ещё) — эту плавно закрываем
+  // Родитель решает, какая сторона открыта: эта строка подстраивается
+  // (сдвиг влево — «Удалить», вправо — «На завтра»), остальные закрываются.
   useEffect(() => {
-    if (!swiped) setDx(0);
+    setDx(swiped === "right" ? SWIPE_W : swiped === "left" ? -SWIPE_W : 0);
   }, [swiped]);
 
   function cancelHold() {
@@ -632,7 +972,12 @@ function EntryRow({
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (event.pointerType === "mouse" && event.button !== 0) return;
     event.currentTarget.setPointerCapture?.(event.pointerId);
-    drag.current = { x: event.clientX, y: event.clientY, base: swiped ? -SWIPE_W : 0, mode: "?" };
+    drag.current = {
+      x: event.clientX,
+      y: event.clientY,
+      base: swiped === "left" ? -SWIPE_W : swiped === "right" ? SWIPE_W : 0,
+      mode: "?",
+    };
     longPressed.current = false;
     cancelHold();
     holdTimer.current = window.setTimeout(() => {
@@ -652,7 +997,7 @@ function EntryRow({
       cancelHold();
       if (d.mode === "scroll") return;
     }
-    setDx(Math.max(-SWIPE_W, Math.min(0, d.base + mx)));
+    setDx(Math.max(-SWIPE_W, Math.min(SWIPE_W, d.base + mx)));
   }
 
   function handlePointerEnd() {
@@ -661,9 +1006,9 @@ function EntryRow({
     drag.current = null;
     if (d?.mode === "swipe") {
       suppressClick.current = true;
-      const open = dx <= -SWIPE_W / 2;
-      setDx(open ? -SWIPE_W : 0);
-      onSwipe(open);
+      const side: SwipeSide | null = dx <= -SWIPE_W / 2 ? "left" : dx >= SWIPE_W / 2 ? "right" : null;
+      setDx(side === "left" ? -SWIPE_W : side === "right" ? SWIPE_W : 0);
+      onSwipe(side);
     }
   }
 
@@ -678,7 +1023,7 @@ function EntryRow({
     }
     if (swiped) {
       setDx(0);
-      onSwipe(false);
+      onSwipe(null);
       return;
     }
     onTap();
@@ -686,7 +1031,19 @@ function EntryRow({
 
   return (
     <div className="relative overflow-hidden">
-      {/* красная зона под строкой — видна при свайпе влево */}
+      {/* бирюзовая зона слева — видна при свайпе вправо: копия на завтра в корзину */}
+      <div className="absolute inset-y-0 left-0 flex items-stretch" style={{ width: SWIPE_W }}>
+        <button
+          type="button"
+          aria-label={`Копия «${entry.name}» на завтра`}
+          onClick={onTomorrow}
+          className="flex w-full flex-col items-center justify-center gap-0.5 bg-acc2/85 text-[#0b2b28] transition active:bg-acc2"
+        >
+          <span className="text-base leading-none">📥</span>
+          <span className="text-[10px] font-semibold whitespace-nowrap">На завтра</span>
+        </button>
+      </div>
+      {/* красная зона справа — видна при свайпе влево: удалить с подтверждением */}
       <div className="absolute inset-y-0 right-0 flex items-stretch" style={{ width: SWIPE_W }}>
         <button
           type="button"
@@ -732,7 +1089,12 @@ function EntryRow({
               <span className="whitespace-nowrap font-semibold text-acc">· У {round(totals.carbs, 1)}</span>
             </div>
           </div>
-          <div className="shrink-0 text-xs font-semibold whitespace-nowrap">{round(totals.kcal)}</div>
+          {/* Справа — калории именно этой порции (граммовка × ккал на 100 г).
+              Подпись «ккал» рядом с числом: без неё цифру легко принять
+              за граммы или за ккал на 100 г. */}
+          <div className="shrink-0 text-xs font-semibold whitespace-nowrap">
+            {round(totals.kcal)} <span className="text-[10px] font-medium text-mute">ккал</span>
+          </div>
         </button>
       </div>
     </div>
@@ -868,7 +1230,7 @@ function CenterNotice({ message }: { message: string }) {
       style={{
         left: "max(1rem, calc((100vw - 32rem) / 2 + 1rem))",
         right: "max(5.25rem, calc((100vw - 32rem) / 2 + 5.25rem))",
-        bottom: "calc(5.75rem + env(safe-area-inset-bottom))",
+        bottom: "calc(5.75rem + var(--safe-bottom))",
       }}
     >
       <div className="rise flex min-h-14 w-full items-center rounded-2xl border border-acc2/40 bg-panel px-4 py-2 text-left text-[13px] leading-snug font-semibold text-ink shadow-xl shadow-black/15 backdrop-blur-xl">

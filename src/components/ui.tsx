@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { dropdownPlacement, dropdownScrollDelta, type DropRect } from "../lib/dropdown";
 
 export function Sheet({
   open,
@@ -40,7 +41,7 @@ export function Sheet({
   return (
     <div
       className={`fixed inset-0 z-50 flex justify-center ${
-        full ? "items-stretch p-0 sm:items-center sm:p-4" : placement === "center" ? "items-center p-4" : "items-end p-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))]"
+        full ? "items-stretch p-0 sm:items-center sm:p-4" : placement === "center" ? "items-center p-4" : "items-end p-3 pb-[calc(4.5rem+var(--safe-bottom))]"
       }`}
     >
       {/* Без тёмной подложки (noBackdrop) слой всё равно перехватывает клики —
@@ -178,8 +179,13 @@ export function IconBtn({
 /**
  * Выпадающий список вместо системного <select>: подписи переносятся и видны
  * целиком (в системном они обрезались), меню непрозрачное и не «просвечивает»
- * сквозь него список под ним. Меню позиционируется по кнопке и открывается
- * вверх, если снизу не хватает места.
+ * сквозь него список под ним.
+ *
+ * Меню всегда раскрывается ВНИЗ от кнопки, на всю её ширину и с плавным
+ * раскрытием. Если под кнопкой места мало (она прижата к нижней навигации),
+ * страница сначала чуть прокручивается — чтобы списку было куда раскрыться, —
+ * но вверх список не «переворачивается»: так сразу понятно, что выбор
+ * раскрылся под своим полем.
  */
 export function Select<T extends string | number>({
   value,
@@ -195,32 +201,46 @@ export function Select<T extends string | number>({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [rect, setRect] = useState<{ top: number; bottom: number; left: number; width: number; above: boolean; maxHeight: number } | null>(null);
+  const [rect, setRect] = useState<DropRect | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const current = options.find((o) => o.key === value);
 
+  /** Верх футера-навигации — до него считаем свободное место под полем. */
+  function navTop() {
+    return document.querySelector<HTMLElement>("[data-bottom-nav]")?.getBoundingClientRect().top ?? window.innerHeight;
+  }
+
   function place() {
     const r = buttonRef.current?.getBoundingClientRect();
     if (!r) return;
-    const gutter = 8;
-    const footerTop = document.querySelector<HTMLElement>("[data-bottom-nav]")?.getBoundingClientRect().top ?? window.innerHeight;
-    const below = Math.max(0, Math.min(window.innerHeight, footerTop) - r.bottom - gutter);
-    const above = Math.max(0, r.top - gutter);
-    const desiredHeight = Math.min(320, options.length * 60 + 8);
-    const openUp = below < desiredHeight && above > below;
-    const width = Math.min(r.width, window.innerWidth - gutter * 2);
-    const left = Math.max(gutter, Math.min(r.left, window.innerWidth - width - gutter));
-    const available = openUp ? above : below;
-    setRect({
-      top: r.bottom + 6,
-      bottom: window.innerHeight - r.top + 6,
-      left,
-      width,
-      above: openUp,
-      maxHeight: Math.max(96, Math.min(320, available)),
-    });
+    setRect(
+      dropdownPlacement({
+        trigger: r,
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+        navTop: navTop(),
+      }),
+    );
+  }
+
+  function openMenu() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    // Освобождаем место под списком: подкручиваем страницу так, чтобы пункты
+    // раскрылись вниз целиком, а не упирались в нижнюю навигацию.
+    const r = buttonRef.current?.getBoundingClientRect();
+    if (r) {
+      const delta = dropdownScrollDelta({ trigger: r, navTop: navTop(), optionsCount: options.length });
+      const canScroll = document.documentElement.scrollHeight - window.innerHeight - window.scrollY;
+      if (delta > 0 && canScroll > 0) {
+        window.scrollBy({ top: Math.min(delta + 4, canScroll), behavior: "smooth" });
+      }
+    }
+    place();
+    setOpen(true);
   }
 
   useEffect(() => {
@@ -252,14 +272,7 @@ export function Select<T extends string | number>({
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
-        onClick={() => {
-          if (open) {
-            setOpen(false);
-            return;
-          }
-          place();
-          setOpen(true);
-        }}
+        onClick={openMenu}
         className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left transition active:scale-[0.99] ${
           open ? "border-acc2 bg-panel2" : "border-line bg-panel2 hover:border-acc2/50"
         }`}
@@ -282,11 +295,10 @@ export function Select<T extends string | number>({
               zIndex: 80,
               left: rect.left,
               width: rect.width,
+              top: rect.top,
               maxHeight: rect.maxHeight,
-              top: rect.above ? undefined : rect.top,
-              bottom: rect.above ? rect.bottom : undefined,
             }}
-            className="overflow-y-auto overscroll-contain rounded-xl border border-line bg-[#241a40] p-1 shadow-2xl shadow-black/60"
+            className="drop-in overflow-y-auto overscroll-contain rounded-xl border border-line bg-[#241a40] p-1 shadow-2xl shadow-black/60"
           >
             {options.map((option) => {
               const selected = option.key === value;
