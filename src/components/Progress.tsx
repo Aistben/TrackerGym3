@@ -12,35 +12,20 @@ import {
   YAxis,
 } from "recharts";
 import type { AppState, Targets } from "../lib/types";
-import {
-  GOALS,
-  dateRange,
-  daysBetween,
-  etaDays,
-  progressSeries,
-  round,
-  shiftDate,
-  shortDate,
-  today,
-} from "../lib/nutrition";
+import { GOALS, dateRange, dayTotals, daysBetween, etaDays, round, shiftDate, shortDate, today, weightSeries } from "../lib/nutrition";
 import { Btn, Empty, Field, Select, Sheet, numField } from "./ui";
 
 const RANGES = [
-  { d: 7, label: "Неделя", hint: "вес и БЖУ по дням" },
+  { d: 7, label: "Неделя", hint: "вес по дням" },
   { d: 14, label: "2 недели", hint: "14 дней" },
   { d: 30, label: "Месяц", hint: "30 дней" },
   { d: 90, label: "3 месяца", hint: "90 дней" },
   { d: 365, label: "Год", hint: "12 месяцев" },
 ];
 
-/** Цвета линий графика: подписи легенды и сами линии читаются на тёмном фоне. */
-const LINE_COLORS = {
-  вес: "#a855f7",
-  план: "#2dd4bf",
-  белки: "#f59e0b",
-  жиры: "#f87171",
-  углеводы: "#60a5fa",
-};
+/** Цвета графика: фиолетовый — факт, бирюзовый пунктир — план и цель. */
+const WEIGHT_COLOR = "#a855f7";
+const PLAN_COLOR = "#2dd4bf";
 
 export default function Progress({
   state,
@@ -70,21 +55,25 @@ export default function Progress({
     return last ?? { date: profile.startDate, weight: profile.startWeight };
   }, [state.weights, profile.startDate, profile.startWeight, todayDate]);
 
-  /**
-   * Одна точка на день периода: вес (в дни взвешиваний) + плановая траектория
-   * и БЖУ из дневника. БЖУ рисуется линиями на правой оси — без них график
-   * показывал только вес, хотя человек ведёт ещё и еду.
-   */
+  /** График — только вес: линия факта и пунктир плана. */
   const weightData = useMemo(
-    () => progressSeries({ days, meals: state.meals, weights: state.weights, profile, anchor }),
-    [days, state.meals, state.weights, profile, anchor],
+    () => weightSeries({ days, weights: state.weights, profile, anchor }),
+    [days, state.weights, profile, anchor],
   );
 
-  const logged = weightData.filter((d) => d.kcal > 0);
-  const avg = logged.length ? round(logged.reduce((s, d) => s + d.kcal, 0) / logged.length) : 0;
-  const avgP = logged.length
-    ? round(logged.reduce((s, d) => s + (d.белки ?? 0), 0) / logged.length)
-    : 0;
+  // Средние калории и белок считаются по дневнику за выбранный период.
+  const logged = useMemo(() => {
+    const byDate = new Map<string, typeof state.meals>();
+    for (const meal of state.meals) {
+      const list = byDate.get(meal.date) ?? [];
+      list.push(meal);
+      byDate.set(meal.date, list);
+    }
+    return days.map((iso) => dayTotals(byDate.get(iso) ?? [])).filter((total) => total.kcal > 0);
+  }, [days, state.meals]);
+
+  const avg = logged.length ? round(logged.reduce((s, total) => s + total.kcal, 0) / logged.length) : 0;
+  const avgP = logged.length ? round(logged.reduce((s, total) => s + total.protein, 0) / logged.length) : 0;
   const eta = etaDays(profile, currentWeight);
   const delta = round(currentWeight - profile.startWeight, 1);
 
@@ -118,7 +107,7 @@ export default function Progress({
       <div className="card p-4">
         <div className="mb-3 space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="min-w-0 truncate text-sm font-semibold">Вес и БЖУ по дням</h3>
+            <h3 className="min-w-0 truncate text-sm font-semibold">Вес по дням</h3>
             <span className="shrink-0 text-[11px] text-mute">{state.weights.length} записей</span>
           </div>
           <div className="flex items-stretch gap-2">
@@ -133,8 +122,7 @@ export default function Progress({
             </Btn>
           </div>
           <p className="text-[11px] text-mute">
-            Фиолетовая линия — вес, пунктир — план (левая шкала). Цветные линии — белки, жиры и углеводы из дневника
-            (правая шкала). Проведи пальцем по графику, чтобы увидеть день.
+            Фиолетовая линия — вес, бирюзовый пунктир — план и цель. Проведи пальцем по графику, чтобы увидеть день.
           </p>
         </div>
 
@@ -161,12 +149,12 @@ export default function Progress({
         {state.weights.length === 0 ? (
           <Empty icon="⚖️" text="Добавь первое взвешивание — график начнёт строиться" />
         ) : (
-          <ResponsiveContainer width="100%" height={260}>
-            <ComposedChart data={weightData} margin={{ top: 5, right: 0, left: -18, bottom: 0 }}>
+          <ResponsiveContainer width="100%" height={240}>
+            <ComposedChart data={weightData} margin={{ top: 5, right: 10, left: -18, bottom: 0 }}>
               <defs>
                 <linearGradient id="gw" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={LINE_COLORS.вес} stopOpacity={0.35} />
-                  <stop offset="100%" stopColor={LINE_COLORS.вес} stopOpacity={0} />
+                  <stop offset="0%" stopColor={WEIGHT_COLOR} stopOpacity={0.35} />
+                  <stop offset="100%" stopColor={WEIGHT_COLOR} stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid stroke="#3b2d60" vertical={false} />
@@ -176,32 +164,19 @@ export default function Progress({
                 interval={range <= 7 ? 0 : range <= 14 ? 1 : "preserveStartEnd"}
                 minTickGap={range <= 14 ? 0 : 24}
               />
-              <YAxis
-                yAxisId="weight"
-                tick={{ fontSize: 10, fill: "#b0a2cf" }}
-                domain={["dataMin - 1.5", "dataMax + 1.5"]}
-              />
-              <YAxis
-                yAxisId="macro"
-                orientation="right"
-                tick={{ fontSize: 10, fill: "#b0a2cf" }}
-                domain={[0, "dataMax + 10"]}
-                width={30}
-              />
+              <YAxis tick={{ fontSize: 10, fill: "#b0a2cf" }} domain={["dataMin - 1.5", "dataMax + 1.5"]} />
               <Tooltip contentStyle={tipStyle} labelStyle={{ color: "#b0a2cf" }} />
-              <ReferenceLine yAxisId="weight" y={profile.targetWeight} stroke={LINE_COLORS.план} strokeDasharray="4 4" />
+              <ReferenceLine y={profile.targetWeight} stroke={PLAN_COLOR} strokeDasharray="4 4" />
               <Line
-                yAxisId="weight"
                 type="monotone"
                 dataKey="план"
                 name="План, кг"
-                stroke={LINE_COLORS.план}
+                stroke={PLAN_COLOR}
                 strokeWidth={1.6}
                 strokeDasharray="5 5"
                 dot={false}
               />
               <Area
-                yAxisId="weight"
                 type="monotone"
                 dataKey="факт"
                 name="Вес, кг"
@@ -211,19 +186,15 @@ export default function Progress({
                 connectNulls
               />
               <Line
-                yAxisId="weight"
                 type="monotone"
                 dataKey="факт"
                 name="Вес, кг"
-                stroke={LINE_COLORS.вес}
+                stroke={WEIGHT_COLOR}
                 strokeWidth={2.4}
-                dot={{ r: 3, fill: LINE_COLORS.вес }}
+                dot={{ r: 3, fill: WEIGHT_COLOR }}
                 connectNulls
               />
-              <Line yAxisId="macro" type="linear" dataKey="белки" name="Белки, г" stroke={LINE_COLORS.белки} strokeWidth={2} dot={false} connectNulls />
-              <Line yAxisId="macro" type="linear" dataKey="жиры" name="Жиры, г" stroke={LINE_COLORS.жиры} strokeWidth={2} dot={false} connectNulls />
-              <Line yAxisId="macro" type="linear" dataKey="углеводы" name="Углеводы, г" stroke={LINE_COLORS.углеводы} strokeWidth={2} dot={false} connectNulls />
-              <Legend verticalAlign="bottom" height={34} wrapperStyle={{ fontSize: 11, color: "#b0a2cf" }} />
+              <Legend verticalAlign="bottom" height={20} wrapperStyle={{ fontSize: 11, color: "#b0a2cf" }} />
             </ComposedChart>
           </ResponsiveContainer>
         )}

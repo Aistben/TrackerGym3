@@ -159,70 +159,42 @@ export function planWeight(profile: Profile, iso: string, anchor?: WeightAnchor)
   return sign < 0 ? Math.max(w, profile.targetWeight) : Math.min(w, profile.targetWeight);
 }
 
-/**
- * Точка графика «Вес и БЖУ по дням».
- * Вес и БЖУ приходят из разных источников (взвешивания и дневник еды),
- * поэтому в один день может быть только одно из двух — пустые значения
- * recharts просто не рисует.
- */
-export type ProgressPoint = {
+/** Точка графика веса: одна на каждый день периода. */
+export type WeightPoint = {
   iso: string;
   date: string;
   day: string;
-  /** калории за день (0 — в дневнике ничего не записано) */
-  kcal: number;
-  /** вес, кг — только в дни взвешиваний */
+  /** вес, кг — только в дни взвешиваний, иначе линия рвётся */
   факт?: number;
-  /** плановая траектория веса, кг */
+  /** плановая траектория веса, кг — есть в каждой точке */
   план: number;
-  /** БЖУ за день, г — только в дни с записями в дневнике */
-  белки?: number;
-  жиры?: number;
-  углеводы?: number;
 };
 
-/** Данные для графика прогресса: одна точка на каждый день периода. */
-export function progressSeries({
+/**
+ * Данные для графика веса. Вес есть только в дни взвешиваний: пропуски
+ * recharts просто не рисует, а линия плана идёт сплошной.
+ */
+export function weightSeries({
   days,
-  meals,
   weights,
   profile,
   anchor,
 }: {
   days: string[];
-  meals: Meal[];
   weights: WeighIn[];
   profile: Profile;
   anchor?: WeightAnchor;
-}): ProgressPoint[] {
-  const mealsByDate = new Map<string, Meal[]>();
-  for (const meal of meals) {
-    const list = mealsByDate.get(meal.date) ?? [];
-    list.push(meal);
-    mealsByDate.set(meal.date, list);
-  }
+}): WeightPoint[] {
   const weightsByDate = new Map(weights.map((item) => [item.date, item.weight]));
-
   return days
     .filter((iso) => iso >= profile.startDate)
-    .map((iso) => {
-      const totals = dayTotals(mealsByDate.get(iso) ?? []);
-      const weight = weightsByDate.get(iso);
-      const logged = totals.kcal > 0 || totals.protein > 0 || totals.fat > 0 || totals.carbs > 0;
-      return {
-        iso,
-        date: shortDate(iso),
-        day: weekdayDate(iso),
-        kcal: round(totals.kcal),
-        факт: weight,
-        план: round(planWeight(profile, iso, anchor), 1),
-        // БЖУ уходит в график только когда за день есть еда: нули рисовали бы
-        // линии, которые «прилипают» к нулю и портят картину.
-        белки: logged ? round(totals.protein) : undefined,
-        жиры: logged ? round(totals.fat) : undefined,
-        углеводы: logged ? round(totals.carbs) : undefined,
-      };
-    });
+    .map((iso) => ({
+      iso,
+      date: shortDate(iso),
+      day: weekdayDate(iso),
+      факт: weightsByDate.get(iso),
+      план: round(planWeight(profile, iso, anchor), 1),
+    }));
 }
 
 export function etaDays(profile: Profile, currentWeight: number) {
