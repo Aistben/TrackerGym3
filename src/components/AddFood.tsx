@@ -400,9 +400,66 @@ export default function AddFood({
   /* ---------- сканер ---------- */
   if (mode === "scan") return <Scanner onDetect={handleCode} onClose={() => setMode("search")} />;
 
+  /* Лист оценки нужен в двух режимах: из поиска и из карточки продукта. */
+  const estimateSheet = (
+    <Sheet open={estimateOpen} onClose={() => setEstimateOpen(false)} title="Оценить БЖУ по названию" center>
+      <div className="space-y-3">
+        <input
+          className="field compact"
+          {...noSuggest}
+          autoFocus
+          placeholder="Например: шаурма, борщ, творожная запеканка"
+          value={estimateQuery}
+          onChange={(e) => {
+            setEstimateQuery(e.target.value);
+            setOnlineEstimate(null);
+          }}
+        />
+        <p className="text-[11px] leading-snug text-mute">
+          Введи, что съел, — приложение подберёт похожее блюдо из справочника и подставит примерные калории и БЖУ.
+          Значения ориентировочные: проверь и поправь перед сохранением.
+        </p>
+
+        {localEstimates.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="text-[11px] font-medium tracking-wide text-mute uppercase">Похожие блюда</div>
+            {localEstimates.map((estimate) => (
+              <EstimateRow key={estimate.basis + estimate.kcal} estimate={estimate} onPick={applyEstimate} />
+            ))}
+          </div>
+        )}
+
+        {estimateQuery.trim().length >= 2 && !localEstimates.length && !estimateLoading && !onlineEstimate && (
+          <div className="rounded-xl border border-line bg-panel2/60 px-3 py-2 text-[11px] leading-snug text-mute">
+            В справочнике типовых блюд похожего нет. Можно поискать среди реальных продуктов Open Food Facts — посчитаем среднее.
+          </div>
+        )}
+
+        {onlineEstimate && (
+          <div className="space-y-1.5">
+            <div className="text-[11px] font-medium tracking-wide text-mute uppercase">По реальным продуктам</div>
+            <EstimateRow estimate={onlineEstimate} onPick={applyEstimate} />
+          </div>
+        )}
+
+        <Btn
+          variant="soft"
+          size="sm"
+          className="w-full"
+          disabled={estimateQuery.trim().length < 2 || estimateLoading}
+          onClick={searchSimilarOnline}
+        >
+          {estimateLoading ? "Ищем в Open Food Facts…" : "🔎 Поискать похожие в Open Food Facts"}
+        </Btn>
+      </div>
+    </Sheet>
+
+  );
+
   /* ---------- создание / редактирование продукта ---------- */
   if (mode === "form") {
     return (
+      <>
       <div className="space-y-2">
         {notice && <div className="rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-[11px] leading-snug text-warn">{notice}</div>}
         <Field label="Название">
@@ -464,6 +521,8 @@ export default function AddFood({
           </Btn>
         </div>
       </div>
+      {estimateSheet}
+      </>
     );
   }
 
@@ -553,57 +612,7 @@ export default function AddFood({
           online.map((p) => <Row key={p.id} p={p} online onClick={() => pick(p, true)} />)}
       </div>
 
-      <Sheet open={estimateOpen} onClose={() => setEstimateOpen(false)} title="Оценить БЖУ по названию" center>
-        <div className="space-y-3">
-          <input
-            className="field compact"
-            {...noSuggest}
-            autoFocus
-            placeholder="Например: шаурма, борщ, творожная запеканка"
-            value={estimateQuery}
-            onChange={(e) => {
-              setEstimateQuery(e.target.value);
-              setOnlineEstimate(null);
-            }}
-          />
-          <p className="text-[11px] leading-snug text-mute">
-            Введи, что съел, — приложение подберёт похожее блюдо из справочника и подставит примерные калории и БЖУ.
-            Значения ориентировочные: проверь и поправь перед сохранением.
-          </p>
-
-          {localEstimates.length > 0 && (
-            <div className="space-y-1.5">
-              <div className="text-[11px] font-medium tracking-wide text-mute uppercase">Похожие блюда</div>
-              {localEstimates.map((estimate) => (
-                <EstimateRow key={estimate.basis + estimate.kcal} estimate={estimate} onPick={applyEstimate} />
-              ))}
-            </div>
-          )}
-
-          {estimateQuery.trim().length >= 2 && !localEstimates.length && !estimateLoading && !onlineEstimate && (
-            <div className="rounded-xl border border-line bg-panel2/60 px-3 py-2 text-[11px] leading-snug text-mute">
-              В справочнике типовых блюд похожего нет. Можно поискать среди реальных продуктов Open Food Facts — посчитаем среднее.
-            </div>
-          )}
-
-          {onlineEstimate && (
-            <div className="space-y-1.5">
-              <div className="text-[11px] font-medium tracking-wide text-mute uppercase">По реальным продуктам</div>
-              <EstimateRow estimate={onlineEstimate} onPick={applyEstimate} />
-            </div>
-          )}
-
-          <Btn
-            variant="soft"
-            size="sm"
-            className="w-full"
-            disabled={estimateQuery.trim().length < 2 || estimateLoading}
-            onClick={searchSimilarOnline}
-          >
-            {estimateLoading ? "Ищем в Open Food Facts…" : "🔎 Поискать похожие в Open Food Facts"}
-          </Btn>
-        </div>
-      </Sheet>
+      {estimateSheet}
 
       <Sheet open={!!deleteProduct} onClose={() => setDeleteProduct(null)} title="Удалить продукт?" center>
         {deleteProduct && (
