@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ActivityKey, AppState, Goal, Profile, Sex, Targets } from "../lib/types";
 import { ACTIVITY, GOALS, round } from "../lib/nutrition";
 import { emptyState } from "../lib/storage";
-import { formatAdjust, pushValue, undoTarget } from "../lib/adjust";
+import { ADJUST_LIMIT, formatAdjust, pushValue, undoTarget } from "../lib/adjust";
 import { Btn, Field, Select, Sheet } from "./ui";
 
 export default function ProfileView({
@@ -24,7 +24,11 @@ export default function ProfileView({
 
   /* ---------- ручная корректировка калорий: замок и возврат ---------- */
   const locked = !!p.calorieAdjustLocked;
-  const [history, setHistory] = useState<number[]>([]);
+  // История лежит в профиле (localStorage), а не в состоянии вкладки: даже если
+  // значение случайно сдвинули, ушли с экрана и вернулись — стрелка ↩ помнит,
+  // какое число было до этого.
+  const history = p.calorieAdjustHistory ?? [];
+  const setHistory = (next: number[]) => patch({ calorieAdjustHistory: next });
   // Перетаскивание слайдера вызывает onChange десятки раз, а точку возврата
   // нужна одна — на всё движение. Поэтому «сессия» жеста закрывается по паузе.
   const dragging = useRef(false);
@@ -34,7 +38,7 @@ export default function ProfileView({
   function changeAdjust(next: number) {
     if (next === p.calorieAdjust) return;
     if (!dragging.current) {
-      setHistory((h) => pushValue(h, p.calorieAdjust));
+      setHistory(pushValue(history, p.calorieAdjust));
       dragging.current = true;
     }
     window.clearTimeout(dragTimer.current);
@@ -201,8 +205,27 @@ export default function ProfileView({
               disabled={locked}
               aria-label="Ручная корректировка калорий"
               onChange={(e) => changeAdjust(+e.target.value)}
+              // touch-action: pan-y — вертикальный скролл страницы проходит сквозь
+              // слайдер и не сдвигает значение; крутить его нужно осознанно, вбок.
+              style={{ touchAction: "pan-y" }}
               className="min-w-0 flex-1 accent-[#a855f7] disabled:cursor-not-allowed disabled:opacity-40"
             />
+            {/* Стрелка возврата — вплотную к замку: одно нажатие отменяет
+                случайный сдвиг (уехало на +500 — вернёт +300). */}
+            <button
+              type="button"
+              onClick={undoAdjust}
+              disabled={undoValue === null}
+              title={undoValue === null ? "Пока нечего возвращать" : `Вернуть ${formatAdjust(undoValue)}`}
+              aria-label={undoValue === null ? "Возвращать пока нечего" : `Вернуть ${formatAdjust(undoValue)}`}
+              className={`grid size-10 shrink-0 place-items-center rounded-full border text-lg transition active:scale-90 disabled:cursor-not-allowed disabled:opacity-35 ${
+                undoValue === null
+                  ? "border-line bg-panel2 text-mute"
+                  : "border-acc2/60 bg-acc2/15 text-acc2 hover:text-ink"
+              }`}
+            >
+              ↩
+            </button>
             <button
               type="button"
               onClick={toggleAdjustLock}
@@ -218,21 +241,13 @@ export default function ProfileView({
           </div>
         </Field>
 
-        {undoValue !== null && (
-          <button
-            type="button"
-            onClick={undoAdjust}
-            title={`Вернуть ${formatAdjust(undoValue)}`}
-            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-line bg-panel2 px-3 py-2 text-xs text-mute transition hover:border-acc2/50 hover:text-ink active:scale-[0.99]"
-          >
-            ↩ Вернуть {formatAdjust(undoValue)}
-          </button>
-        )}
-
         <p className="text-[11px] leading-snug text-mute">
           {locked
             ? "🔒 Слайдер зафиксирован: случайное касание значение не сдвинет. Снимите замок, чтобы снова менять."
-            : "🔓 Замок рядом со слайдером фиксирует значение, чтобы его не сбить случайным касанием. ↩ возвращает прежнее значение, 25 ккал — один шаг слайдера."}
+            : "🔓 Замок рядом со слайдером фиксирует значение, чтобы его не сбить случайным касанием."}{" "}
+          {undoValue === null
+            ? "↩ рядом с замком вернёт прежнее значение, если слайдер всё-таки уехал (25 ккал — один шаг)."
+            : `↩ рядом с замком вернёт ${formatAdjust(undoValue)} — история хранит до ${ADJUST_LIMIT} шагов и не теряется при закрытии настроек.`}
         </p>
 
         <div className="rounded-xl border border-acc2/20 bg-acc2/8 p-3 text-xs leading-relaxed text-mute">

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { SEED_PRODUCTS } from "../src/lib/seed";
-import { emptyState, loadState } from "../src/lib/storage";
+import { emptyState, loadState, saveState } from "../src/lib/storage";
 import type { Profile } from "../src/lib/types";
 
 const profile: Profile = {
@@ -40,6 +40,24 @@ test("ручные БЖУ из старых версий вычищаются п
   const state = loadState();
   assert.ok(state.profile);
   assert.ok(!("customMacros" in state.profile), "старые ручные макросы остались в профиле");
+  assert.equal(state.profile.calorieAdjust, 0);
+});
+
+test("история возврата корректировки живёт в профиле и переживает перезапуск", () => {
+  withStorage({ ...emptyState, profile: { ...profile, calorieAdjust: 300, calorieAdjustHistory: [0, 150] } });
+  const saved = loadState();
+  assert.deepEqual(saved.profile?.calorieAdjustHistory, [0, 150]);
+
+  // сохраняем поверх — стрелка ↩ должна помнить шаги и в новой сессии
+  saveState(saved);
+  assert.deepEqual(loadState().profile?.calorieAdjustHistory, [0, 150]);
+});
+
+test("старый профиль без истории возврата не ломается", () => {
+  withStorage({ ...emptyState, profile });
+  const state = loadState();
+  assert.ok(state.profile);
+  assert.equal(state.profile.calorieAdjustHistory, undefined);
   assert.equal(state.profile.calorieAdjust, 0);
 });
 
