@@ -65,6 +65,9 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
 .rise { animation: rise .22s ease-out both; }
 @keyframes sheet-in { from { transform: translateY(100%); } to { transform: none; } }
 .sheet-in { animation: sheet-in .25s cubic-bezier(.22,1,.36,1) both; }
+@keyframes scan-beam { from { transform: translateY(0); opacity: .65; } to { transform: translateY(72px); opacity: 1; } }
+.scan-beam { animation: scan-beam 1.7s ease-in-out infinite alternate; }
+@media (prefers-reduced-motion: reduce) { .scan-beam { animation: none; } }
 
 @media (min-width: 640px) {
   body { background-size: cover, 100% auto; }

@@ -55,6 +55,10 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
     },
     [finish],
   );
+  // Callback обновляется при ререндерах формы продукта. Читаем его через ref,
+  // чтобы это не перезапускало поток камеры и не сбрасывало авто-сканирование.
+  const acceptRef = useRef(accept);
+  acceptRef.current = accept;
 
   /* ---------- живое видео: нативный BarcodeDetector + ZXing на каждом кадре ---------- */
   useEffect(() => {
@@ -120,7 +124,7 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
             }
             if (cancelled || done.current) return;
             const nativeCode = pickProductCode(frameCodes);
-            if (nativeCode) return void accept(nativeCode);
+            if (nativeCode) return void acceptRef.current(nativeCode);
 
             if (context) {
               const scale = Math.min(1, LIVE_WIDTH / video.videoWidth);
@@ -134,12 +138,12 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
               const results = decodePixels(frame.data, canvas.width, canvas.height, deep ? { multiple: true } : {});
               if (cancelled || done.current) return;
               const zxingCode = pickProductCode(results.map((r) => ({ rawValue: r.getText(), format: r.getBarcodeFormat() })));
-              if (zxingCode) return void accept(zxingCode);
+              if (zxingCode) return void acceptRef.current(zxingCode);
             }
 
             // В кадре что-то было (например, рекламный QR без номера товара) —
             // подсказываем, что именно не так, но продолжаем сканировать.
-            if (frameCodes.length) accept("", frameCodes[0].rawValue);
+            if (frameCodes.length) acceptRef.current("", frameCodes[0].rawValue);
           }
           if (!cancelled && !done.current) frameTimer = window.setTimeout(tick, 150);
         };
@@ -149,10 +153,10 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
         setStarting(false);
         setError(
           e?.message === "insecure-context"
-            ? "Камера работает только по HTTPS. Открой защищённую ссылку приложения или выбери фото ниже."
+            ? "Живое сканирование требует HTTPS. Открой защищённую ссылку приложения."
             : e?.name === "NotAllowedError"
-              ? "Браузер не дал доступ к камере. Разреши камеру для сайта — или сними штрихкод камерой телефона кнопкой ниже."
-              : "Живое видео недоступно (часто так во встроенном окне). Сними штрихкод камерой телефона кнопкой ниже.",
+              ? "Нет доступа к камере. Разреши его в настройках браузера и снова открой сканер."
+              : "Живая камера недоступна в этом окне. Открой приложение в Safari или Chrome.",
         );
       }
     }
@@ -167,7 +171,7 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
     };
     stopRef.current = stop;
     return stop;
-  }, [facing, accept]);
+  }, [facing]);
 
   async function toggleTorch() {
     const track = streamRef.current?.getVideoTracks()[0];
@@ -232,7 +236,9 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
         <video ref={videoRef} className="size-full object-cover" muted playsInline autoPlay />
         {!error && (
           <div className="pointer-events-none absolute inset-0 grid place-items-center">
-            <div className="h-24 w-[80%] rounded-xl border-2 border-acc/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.38)]" />
+            <div className="relative h-24 w-[80%] rounded-xl border-2 border-acc/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.38)]">
+              {!starting && <span className="scan-beam absolute inset-x-2 top-2 h-px bg-acc2 shadow-[0_0_8px_2px_rgba(45,212,191,0.8)]" />}
+            </div>
           </div>
         )}
         {!error && (
@@ -255,19 +261,23 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
             </button>
           </div>
         )}
-        {starting && !error && (
-          <div className="absolute inset-x-0 bottom-2 text-center text-[11px] text-white/70">включаем камеру…</div>
+        {!error && (
+          <div className="absolute inset-x-0 bottom-2 flex justify-center px-2">
+            <span className="rounded-full border border-white/20 bg-black/65 px-3 py-1.5 text-center text-[11px] text-white/90">
+              {starting ? "Подключаем камеру…" : "Автосканирование · наведите код"}
+            </span>
+          </div>
         )}
         {error && <div className="absolute inset-0 grid place-items-center bg-ink/90 p-5 text-center text-xs text-mute">{error}</div>}
       </div>
 
       <p className="text-center text-[11px] leading-snug text-mute">
-        Наведи на штрихкод, QR или DataMatrix с номером товара (GTIN). QR со ссылкой на сайт или чеком не содержит БЖУ. Поиск — в своей базе и Open Food Facts.
+        Сканирование идёт прямо по видео — фото делать не нужно. Наведи на штрихкод или QR с номером товара (GTIN); ссылки и чеки товарного номера не содержат.
       </p>
 
       {slow && !warn && !error && (
         <div className="rounded-xl border border-acc2/30 bg-acc2/10 px-3 py-2 text-[11px] leading-snug text-acc2">
-          Долго не получается? Сними фото кнопкой ниже — по фото код находится надёжнее.
+          Код пока не распознан? Проверь резкость и освещение или используй фото как запасной вариант.
         </div>
       )}
       {warn && <div className="rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-[11px] leading-snug text-warn">{warn}</div>}
@@ -280,16 +290,18 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
         hidden
         onChange={(e) => e.target.files?.[0] && decodeFile(e.target.files[0])}
       />
-      <Btn variant="soft" size="sm" className="w-full" disabled={busy} onClick={() => fileRef.current?.click()}>
-        {busy ? "Распознаём фото…" : "📸 Снять камерой телефона / выбрать фото"}
-      </Btn>
+      {(error || slow) && (
+        <Btn variant="soft" size="sm" className="w-full" disabled={busy} onClick={() => fileRef.current?.click()}>
+          {busy ? "Распознаём фото…" : "Резерв: сделать снимок или выбрать фото"}
+        </Btn>
+      )}
 
       <div className="flex gap-2">
         <input
-          className="field compact"
+          className="field compact min-w-0 flex-1"
           {...noSuggest}
           aria-label="Штрихкод или содержимое QR"
-          placeholder="Введи штрихкод или вставь текст QR"
+          placeholder="Штрихкод или текст QR"
           value={manual}
           onChange={(e) => setManual(e.target.value)}
         />

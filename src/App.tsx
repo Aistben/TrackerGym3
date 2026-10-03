@@ -82,7 +82,7 @@ export default function App() {
     );
   }
 
-  /** Открыть сканер штрихкода: просим дневник открыть добавление сразу в режиме сканера. */
+  /** Открыть сканер напрямую: дневник создаст временный приём на сегодня и текущее время. */
   function openBarcodeScanner() {
     setTab("day");
     setScanRequest((value) => value + 1);
@@ -129,7 +129,7 @@ export default function App() {
         </button>
       )}
 
-      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[rgb(24_16_44/.92)] backdrop-blur-xl">
+      <nav data-bottom-nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[rgb(24_16_44/.92)] backdrop-blur-xl">
         <div className="mx-auto flex max-w-lg px-2 py-1.5">
           {TABS.map((t) => {
             const isActive = tab === t.key;

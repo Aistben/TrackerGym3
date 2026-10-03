@@ -1,18 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AppState, Meal, MealEntry, Product, Targets } from "../lib/types";
-import { dayTotals, entryTotals, humanDate, round, shiftDate, shortDate, sumTotals, today } from "../lib/nutrition";
+import { dayTotals, entryTotals, humanDate, round, shiftDate, sumTotals, today } from "../lib/nutrition";
 import { uid } from "../lib/storage";
 import { Bar, Btn, Empty, Field, IconBtn, Ring, Sheet, noSuggest, numField } from "./ui";
 import AddFood from "./AddFood";
 
 type EntryAction = { mealId: string; mealTitle: string; entry: MealEntry };
-
-/** Быстрые дни в окне «куда добавить продукт со сканера». */
-const SCAN_DAY_CHIPS = [
-  { label: "Сегодня", offset: 0 },
-  { label: "Вчера", offset: -1 },
-  { label: "Завтра", offset: 1 },
-] as const;
 
 export default function DayView({
   state,
@@ -34,17 +27,12 @@ export default function DayView({
 }) {
   const [addTo, setAddTo] = useState<Meal | null>(null);
   const [addMode, setAddMode] = useState<"search" | "scan">("search");
-  const [scanPick, setScanPick] = useState(false);
-  /** день, в который попадёт товар со сканера (может отличаться от открытого) */
-  const [scanDay, setScanDay] = useState(date);
-  const [scanTime, setScanTime] = useState(nowTime());
   const [newMeal, setNewMeal] = useState(false);
   const [timePick, setTimePick] = useState<Meal | null>(null);
   const [editEntry, setEditEntry] = useState<EntryAction | null>(null);
   const [moveEntry, setMoveEntry] = useState<EntryAction | null>(null);
   const [deleteMeal, setDeleteMeal] = useState<Meal | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [scanCalendar, setScanCalendar] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ mealId: string; entryId: string; grams: number } | null>(null);
   const [swipedId, setSwipedId] = useState<string | null>(null);
@@ -66,10 +54,6 @@ export default function DayView({
         : meal,
     );
   }, [meals, preview]);
-  const scanMeals = useMemo(
-    () => state.meals.filter((m) => m.date === scanDay).sort((a, b) => a.time.localeCompare(b.time)),
-    [state.meals, scanDay],
-  );
   const baseTotals = dayTotals(visibleMeals);
   const totals = useMemo(() => {
     if (!draftPreview) return baseTotals;
@@ -83,19 +67,7 @@ export default function DayView({
     };
   }, [baseTotals, draftPreview]);
   const left = Math.max(0, targets.calories - totals.kcal);
-  /** выбран ли в окне сканера один из быстрых дней (сегодня/вчера/завтра) */
-  const scanDayIsQuick = SCAN_DAY_CHIPS.some((chip) => scanDay === shiftDate(today(), chip.offset));
-  const hasOverlay = !!(
-    addTo ||
-    scanPick ||
-    newMeal ||
-    timePick ||
-    editEntry ||
-    moveEntry ||
-    deleteMeal ||
-    calendarOpen ||
-    scanCalendar
-  );
+  const hasOverlay = !!(addTo || newMeal || timePick || editEntry || moveEntry || deleteMeal || calendarOpen);
 
   const handlePortionPreview = useCallback(
     (preview: { product: Product; grams: number } | null) => setDraftPreview(preview),
@@ -120,14 +92,13 @@ export default function DayView({
     };
   }, []);
 
-  // Плавающая иконка сканера. Флаг поднимается и тут же гасится в App, поэтому
-  // переключение вкладок (и повторный mount дневника) больше не открывает
-  // добавление само по себе. Сначала спрашиваем «куда добавить» — день и строку,
-  // и только потом включаем камеру.
+  // Плавающая кнопка сразу включает сканер. Создаём временный приём на сегодня
+  // и на время нажатия; при отмене пустая карточка удаляется, после добавления
+  // продукта она остаётся в дневнике.
   useEffect(() => {
     if (!scanRequest) return;
     onScanRequestHandled();
-    openScanPicker();
+    startQuickScan();
   }, [scanRequest, onScanRequestHandled]);
 
   function addMeal(title: string, time: string, day = date): Meal {
@@ -136,30 +107,13 @@ export default function DayView({
     return meal;
   }
 
-  /** Иконка сканера: сначала выбираем день и строку-приём, потом камера. */
-  function openScanPicker() {
-    setScanDay(date);
-    setScanTime(nowTime());
-    setScanPick(true);
-  }
-
-  function openScanFor(meal: Meal) {
-    setTempMealId(null);
-    setAddMode("scan");
-    setAddTo(meal);
-    setScanPick(false);
-    // Ушли в другой день — показываем его в дневнике, чтобы товар был на виду.
-    if (meal.date !== date) setDate(meal.date);
-  }
-
-  /** Новый приём на выбранный день (время можно поправить тут же) и сразу сканер. */
-  function createScanMeal() {
-    const meal = addMeal("", scanTime, scanDay);
+  function startQuickScan() {
+    const scanDate = today();
+    const meal = addMeal("", nowTime(), scanDate);
+    setDate(scanDate);
     setTempMealId(meal.id);
     setAddMode("scan");
     setAddTo(meal);
-    setScanPick(false);
-    if (scanDay !== date) setDate(scanDay);
   }
 
   function addEntry(mealId: string, e: MealEntry) {
@@ -341,14 +295,13 @@ export default function DayView({
               </button>
               <div className="min-w-0 flex-1">
                 {meal.title?.trim() && meal.title.trim() !== "Приём" && (
-                  <div className="truncate text-sm font-semibold">{meal.title.trim()}</div>
+                  <div className="break-words text-sm leading-snug font-semibold">{meal.title.trim()}</div>
                 )}
-                {/* КБЖУ приёма — всегда одной строкой, без переносов */}
-                <div className="text-[11px] font-semibold whitespace-nowrap">
-                  <span className="text-ink">{round(t.kcal)} ккал</span>
-                  <span className="text-acc2"> · Б {round(t.protein)}</span>
-                  <span className="text-warn"> · Ж {round(t.fat)}</span>
-                  <span className="text-acc"> · У {round(t.carbs)}</span>
+                <div className="flex min-w-0 flex-wrap items-center gap-x-1 text-[10px] leading-snug font-semibold">
+                  <span className="whitespace-nowrap text-ink">{round(t.kcal)} ккал</span>
+                  <span className="whitespace-nowrap text-acc2">· Б {round(t.protein)}</span>
+                  <span className="whitespace-nowrap text-warn">· Ж {round(t.fat)}</span>
+                  <span className="whitespace-nowrap text-acc">· У {round(t.carbs)}</span>
                 </div>
               </div>
               <IconBtn onClick={() => copyMeal(meal, shiftDate(date, 1))} title="Копия на завтра" size={28}>
@@ -416,106 +369,6 @@ export default function DayView({
       <Btn variant="soft" className="w-full" onClick={() => setNewMeal(true)}>
         + Новый приём пищи
       </Btn>
-
-      {/* Куда сканируем: день + строка-приём. Открывается с плавающей иконки
-          сканера — там же, где раньше товар молча улетал в последний приём. */}
-      <Sheet open={scanPick} onClose={() => setScanPick(false)} title="Куда добавить продукт?" center>
-        <div className="space-y-3">
-          <div>
-            <div className="mb-1.5 text-[11px] font-semibold tracking-wide text-mute uppercase">
-              День · {humanDate(scanDay)}
-            </div>
-            <div className="grid grid-cols-4 gap-1.5">
-              {SCAN_DAY_CHIPS.map((chip) => {
-                const value = chip.offset === 0 ? today() : shiftDate(today(), chip.offset);
-                const active = scanDay === value;
-                return (
-                  <button
-                    type="button"
-                    key={chip.label}
-                    onClick={() => setScanDay(value)}
-                    className={`rounded-xl border px-1 py-2 text-[11px] leading-tight font-medium transition active:scale-95 ${
-                      active ? "border-acc bg-acc/15 text-acc" : "border-line bg-panel2 text-mute hover:text-ink"
-                    }`}
-                  >
-                    {chip.label}
-                  </button>
-                );
-              })}
-              <button
-                type="button"
-                onClick={() => setScanCalendar(true)}
-                title="Выбрать другой день"
-                className={`rounded-xl border px-1 py-2 text-[11px] leading-tight font-medium transition active:scale-95 ${
-                  scanDayIsQuick
-                    ? "border-line bg-panel2 text-mute hover:text-ink"
-                    : "border-acc bg-acc/15 text-acc"
-                }`}
-              >
-                📅 {scanDayIsQuick ? "Другой" : shortDate(scanDay)}
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-1.5 text-[11px] font-semibold tracking-wide text-mute uppercase">
-              Строка — приём, куда попадёт товар
-            </div>
-            <div className="space-y-2">
-              {scanMeals.map((meal) => (
-                <button
-                  type="button"
-                  key={meal.id}
-                  onClick={() => openScanFor(meal)}
-                  className="flex w-full items-center gap-3 rounded-xl border border-line bg-panel2 px-3 py-3 text-left transition hover:border-acc/60 active:scale-[0.99]"
-                >
-                  <span className="shrink-0 rounded-lg bg-panel px-2 py-1 font-mono text-xs whitespace-nowrap text-acc2">
-                    {meal.time}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{mealTitle(meal.title)}</span>
-                  <span className="shrink-0 text-xs text-mute">{meal.entries.length} поз.</span>
-                </button>
-              ))}
-              {!scanMeals.length && (
-                <div className="rounded-xl border border-dashed border-line px-3 py-4 text-center text-xs text-mute">
-                  На этот день приёмов ещё нет — создай новый ниже, сканер откроется сразу.
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-line bg-panel2/60 p-2.5">
-            <div className="mb-1.5 text-[11px] font-semibold tracking-wide text-mute uppercase">Новый приём</div>
-            <div className="flex items-center gap-2">
-              <input
-                type="time"
-                value={scanTime}
-                onChange={(e) => setScanTime(e.target.value || nowTime())}
-                className="field compact w-28 shrink-0 text-center font-mono"
-                aria-label="Время нового приёма"
-              />
-              <Btn variant="soft" className="min-w-0 flex-1" onClick={createScanMeal}>
-                ➕ Создать и сканировать
-              </Btn>
-            </div>
-            <p className="mt-1.5 text-[11px] leading-snug text-mute">
-              Время уже можно поменять в дневнике — нажми на часы у приёма.
-            </p>
-          </div>
-        </div>
-      </Sheet>
-
-      <Sheet open={scanCalendar} onClose={() => setScanCalendar(false)} title="День для сканирования" center>
-        <CalendarView
-          state={state}
-          targets={targets}
-          selectedDate={scanDay}
-          onSelect={(selectedDate) => {
-            setScanDay(selectedDate);
-            setScanCalendar(false);
-          }}
-        />
-      </Sheet>
 
       <Sheet
         open={!!addTo}
@@ -863,12 +716,11 @@ function EntryRow({
           <div className="min-w-0 flex-1">
             {/* Полное название — без обрезки */}
             <div className="text-sm leading-snug break-words">{entry.name}</div>
-            {/* граммы и БЖУ — одной строкой */}
-            <div className="mt-0.5 text-[11px] whitespace-nowrap">
-              <span className="text-mute">{round(entry.grams)} г</span>
-              <span className="font-semibold text-acc2"> · Б {round(totals.protein, 1)}</span>
-              <span className="font-semibold text-warn"> · Ж {round(totals.fat, 1)}</span>
-              <span className="font-semibold text-acc"> · У {round(totals.carbs, 1)}</span>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-1 text-[10px] leading-snug">
+              <span className="whitespace-nowrap text-mute">{round(entry.grams)} г</span>
+              <span className="whitespace-nowrap font-semibold text-acc2">· Б {round(totals.protein, 1)}</span>
+              <span className="whitespace-nowrap font-semibold text-warn">· Ж {round(totals.fat, 1)}</span>
+              <span className="whitespace-nowrap font-semibold text-acc">· У {round(totals.carbs, 1)}</span>
             </div>
           </div>
           <div className="shrink-0 text-xs font-semibold whitespace-nowrap">{round(totals.kcal)}</div>
@@ -902,7 +754,7 @@ function EntryMoveSheet({
           className="flex w-full items-center gap-3 rounded-xl border border-line bg-panel2 px-3 py-3 text-left transition hover:border-acc/60"
         >
           <span className="font-mono text-xs text-acc2">{meal.time}</span>
-          <span className="min-w-0 flex-1 truncate font-medium">{mealTitle(meal.title)}</span>
+          <span className="min-w-0 flex-1 text-sm leading-snug font-medium break-words">{mealTitle(meal.title)}</span>
           <span className="text-lg text-acc">→</span>
         </button>
       ))}
@@ -989,7 +841,7 @@ function CalendarView({
           );
         })}
       </div>
-      <div className="grid grid-cols-3 gap-2 text-[10px] text-mute">
+      <div className="grid grid-cols-1 gap-1.5 text-[10px] text-mute min-[360px]:grid-cols-3 min-[360px]:gap-2">
         <div className="rounded-lg bg-acc2/12 px-2 py-1.5 text-center"><span className="text-acc2">●</span> цель выполнена</div>
         <div className="rounded-lg bg-bad/10 px-2 py-1.5 text-center"><span className="text-bad">●</span> ниже или выше нормы</div>
         <div className="rounded-lg bg-panel2/55 px-2 py-1.5 text-center"><span>●</span> нет записей</div>

@@ -61,6 +61,20 @@ test("старый профиль без истории возврата не л
   assert.equal(state.profile.calorieAdjust, 0);
 });
 
+test("старые профили получают замок по умолчанию, явную разблокировку сохраняем", () => {
+  withStorage({ ...emptyState, profile: { ...profile, calorieAdjustLocked: false } });
+  const migrated = loadState();
+  assert.equal(migrated.profile?.calorieAdjustLocked, true);
+  assert.equal(migrated.profile?.calorieAdjustLockInitialized, true);
+
+  const unlocked = {
+    ...migrated,
+    profile: { ...migrated.profile!, calorieAdjustLocked: false },
+  };
+  saveState(unlocked);
+  assert.equal(loadState().profile?.calorieAdjustLocked, false);
+});
+
 test("без сохранённых данных отдаём базовое состояние с продуктами", () => {
   (globalThis as any).localStorage = { getItem: () => null, setItem: () => undefined, removeItem: () => undefined };
   const state = loadState();

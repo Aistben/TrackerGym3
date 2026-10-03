@@ -27,7 +27,8 @@ export default function Onboarding({ onDone }: { onDone: (p: Profile) => void })
       pace: goal === "maintain" ? 0 : +pace || 0.5,
       startDate: today(),
       calorieAdjust: 0,
-      calorieAdjustLocked: false,
+      calorieAdjustLocked: true,
+      calorieAdjustLockInitialized: true,
     }),
     [sex, age, height, weight, target, activity, goal, pace],
   );
@@ -128,8 +129,8 @@ export default function Onboarding({ onDone }: { onDone: (p: Profile) => void })
                 }`}
               >
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">{ACTIVITY[a].label}</span>
-                  <span className="block truncate text-xs text-mute">{ACTIVITY[a].hint}</span>
+                  <span className="block text-sm font-medium leading-snug">{ACTIVITY[a].label}</span>
+                  <span className="mt-0.5 block text-xs leading-snug text-mute">{ACTIVITY[a].hint}</span>
                 </span>
                 <span className="shrink-0 font-mono text-xs whitespace-nowrap text-mute">×{ACTIVITY[a].k}</span>
               </button>

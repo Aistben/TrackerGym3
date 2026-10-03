@@ -99,6 +99,14 @@ export function shiftDate(iso: string, days: number) {
   return toISO(d);
 }
 
+/** Даты выбранного периода, включая конечный день (без лишних будущих точек). */
+export function dateRange(end: string, count: number) {
+  const length = Math.max(0, Math.floor(count));
+  if (!length) return [];
+  const start = shiftDate(end, -(length - 1));
+  return Array.from({ length }, (_, index) => shiftDate(start, index));
+}
+
 export function daysBetween(a: string, b: string) {
   const d1 = new Date(a + "T12:00:00").getTime();
   const d2 = new Date(b + "T12:00:00").getTime();

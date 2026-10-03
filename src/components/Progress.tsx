@@ -12,7 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import type { AppState, Targets } from "../lib/types";
-import { GOALS, dayTotals, etaDays, planWeight, round, shiftDate, shortDate, today, weekdayDate } from "../lib/nutrition";
+import { GOALS, dateRange, dayTotals, etaDays, planWeight, round, shiftDate, shortDate, today, weekdayDate } from "../lib/nutrition";
 import { Btn, Empty, Field, Select, Sheet, numField } from "./ui";
 
 const RANGES = [
@@ -37,13 +37,9 @@ export default function Progress({
   const [range, setRange] = useState(7);
   const [weighOpen, setWeighOpen] = useState(false);
   const profile = state.profile!;
+  const todayDate = today();
 
-  const days = useMemo(() => {
-    const start = shiftDate(today(), -(range - 1));
-    const out: string[] = [];
-    for (let i = 0; i < range; i++) out.push(shiftDate(start, i));
-    return out;
-  }, [range]);
+  const days = useMemo(() => dateRange(todayDate, range), [todayDate, range]);
 
   const nutritionData = useMemo(() => {
     const mealsByDate = new Map<string, typeof state.meals>();
@@ -69,31 +65,24 @@ export default function Progress({
   // чтобы линия плана всегда стартовала от реальности и шла к текущей цели.
   const anchor = useMemo(() => {
     const last = [...state.weights]
-      .filter((item) => item.date <= today())
+      .filter((item) => item.date <= todayDate)
       .sort((a, b) => a.date.localeCompare(b.date))
       .at(-1);
     return last ?? { date: profile.startDate, weight: profile.startWeight };
-  }, [state.weights, profile.startDate, profile.startWeight]);
+  }, [state.weights, profile.startDate, profile.startWeight, todayDate]);
 
   const weightData = useMemo(() => {
-    const from = shiftDate(today(), -(range - 1));
     const weightsByDate = new Map(state.weights.map((item) => [item.date, item.weight]));
-    const list: { date: string; day: string; iso: string; факт?: number; план: number }[] = [];
-    const startIso = profile.startDate < from ? from : profile.startDate;
-    let iso = startIso;
-    const end = shiftDate(today(), 14);
-    while (iso <= end) {
-      list.push({
+    return days
+      .filter((iso) => iso >= profile.startDate)
+      .map((iso) => ({
         date: shortDate(iso),
         day: weekdayDate(iso),
         iso,
         факт: weightsByDate.get(iso),
         план: round(planWeight(profile, iso, anchor), 1),
-      });
-      iso = shiftDate(iso, 1);
-    }
-    return list;
-  }, [state.weights, profile, range, anchor]);
+      }));
+  }, [days, state.weights, profile, anchor]);
 
   const logged = nutritionData.filter((d) => d.kcal > 0);
   const avg = logged.length ? round(logged.reduce((s, d) => s + d.kcal, 0) / logged.length) : 0;
@@ -144,7 +133,7 @@ export default function Progress({
               <XAxis
                 dataKey={range <= 14 ? "day" : "date"}
                 tick={{ fontSize: 10, fill: "#b0a2cf" }}
-                interval={range <= 14 ? 0 : "preserveStartEnd"}
+                interval={range <= 7 ? 0 : range <= 14 ? 1 : "preserveStartEnd"}
                 minTickGap={range <= 14 ? 0 : 24}
               />
               <YAxis yAxisId="weight" tick={{ fontSize: 10, fill: "#b0a2cf" }} domain={["dataMin - 1.5", "dataMax + 1.5"]} />
