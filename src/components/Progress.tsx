@@ -63,6 +63,16 @@ export default function Progress({
     });
   }, [days, state.meals]);
 
+  // Якорь плана — последнее взвешивание на сегодня (актуальный вес),
+  // чтобы линия плана всегда стартовала от реальности и шла к текущей цели.
+  const anchor = useMemo(() => {
+    const last = [...state.weights]
+      .filter((item) => item.date <= today())
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .at(-1);
+    return last ?? { date: profile.startDate, weight: profile.startWeight };
+  }, [state.weights, profile.startDate, profile.startWeight]);
+
   const weightData = useMemo(() => {
     const from = shiftDate(today(), -(range - 1));
     const weightsByDate = new Map(state.weights.map((item) => [item.date, item.weight]));
@@ -75,12 +85,12 @@ export default function Progress({
         date: shortDate(iso),
         iso,
         факт: weightsByDate.get(iso),
-        план: round(planWeight(profile, iso), 1),
+        план: round(planWeight(profile, iso, anchor), 1),
       });
       iso = shiftDate(iso, 1);
     }
     return list;
-  }, [state.weights, profile, range]);
+  }, [state.weights, profile, range, anchor]);
 
   const logged = nutritionData.filter((d) => d.kcal > 0);
   const avg = logged.length ? round(logged.reduce((s, d) => s + d.kcal, 0) / logged.length) : 0;
@@ -128,7 +138,7 @@ export default function Progress({
               <YAxis yAxisId="weight" tick={{ fontSize: 10, fill: "#b0a2cf" }} domain={["dataMin - 1.5", "dataMax + 1.5"]} />
               <Tooltip contentStyle={tipStyle} labelStyle={{ color: "#b0a2cf" }} />
               <ReferenceLine yAxisId="weight" y={profile.targetWeight} stroke="#2dd4bf" strokeDasharray="4 4" />
-              <Line yAxisId="weight" type="monotone" dataKey="план" name="План, кг" stroke="#2dd4bf" strokeWidth={1.6} strokeDasharray="5 5" dot={false} />
+              <Line yAxisId="weight" type="monotone" dataKey="план" name="План от текущего веса, кг" stroke="#2dd4bf" strokeWidth={1.6} strokeDasharray="5 5" dot={false} />
               <Area yAxisId="weight" type="monotone" dataKey="факт" name="Вес, кг" stroke="none" fill="url(#gw)" connectNulls />
               <Line yAxisId="weight" type="monotone" dataKey="факт" name="Вес, кг" stroke="#a855f7" strokeWidth={2.4} dot={{ r: 3, fill: "#a855f7" }} connectNulls />
               <Legend verticalAlign="bottom" height={20} wrapperStyle={{ fontSize: 11, color: "#b0a2cf" }} />

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import { extractBarcode } from "../lib/barcode";
-import { Btn } from "./ui";
+import { Btn, noSuggest } from "./ui";
 
 const FORMATS = [
   BarcodeFormat.EAN_13,
@@ -222,20 +222,20 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
   }
 
   return (
-    <div className="space-y-3">
-      <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-line bg-black sm:aspect-[4/3]">
+    <div className="space-y-2.5">
+      <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-line bg-black">
         <video ref={videoRef} className="size-full object-cover" muted playsInline autoPlay />
         {!error && (
           <div className="pointer-events-none absolute inset-0 grid place-items-center">
-            <div className="h-32 w-[82%] rounded-xl border-2 border-acc/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.38)]" />
+            <div className="h-24 w-[80%] rounded-xl border-2 border-acc/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.38)]" />
           </div>
         )}
         {!error && (
-          <div className="absolute top-2 right-2 flex gap-2">
+          <div className="absolute top-2 right-2 flex gap-1.5">
             {hasTorch && (
               <button
                 onClick={toggleTorch}
-                className={`grid size-10 place-items-center rounded-full border border-white/20 backdrop-blur ${
+                className={`grid size-9 place-items-center rounded-full border border-white/20 text-sm backdrop-blur ${
                   torchOn ? "bg-warn/80 text-ink" : "bg-black/50"
                 }`}
               >
@@ -244,29 +244,28 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
             )}
             <button
               onClick={() => setFacing((f) => (f === "environment" ? "user" : "environment"))}
-              className="grid size-10 place-items-center rounded-full border border-white/20 bg-black/50 backdrop-blur"
+              className="grid size-9 place-items-center rounded-full border border-white/20 bg-black/50 text-sm backdrop-blur"
             >
               🔄
             </button>
           </div>
         )}
         {starting && !error && (
-          <div className="absolute inset-x-0 bottom-3 text-center text-xs text-white/70">включаем камеру…</div>
+          <div className="absolute inset-x-0 bottom-2 text-center text-[11px] text-white/70">включаем камеру…</div>
         )}
-        {error && <div className="absolute inset-0 grid place-items-center bg-ink/90 p-6 text-center text-sm text-mute">{error}</div>}
+        {error && <div className="absolute inset-0 grid place-items-center bg-ink/90 p-5 text-center text-xs text-mute">{error}</div>}
       </div>
 
-      <p className="text-center text-xs text-mute">
-        Наведи на полосатый штрихкод (EAN-13 / EAN-8 / UPC). QR тоже читается, если в нём зашит номер товара.
+      <p className="text-center text-[11px] leading-snug text-mute">
+        Наведи на полосатый штрихкод (EAN-13 / EAN-8 / UPC). QR читается, если в нём номер товара.
       </p>
 
       {slow && !warn && !error && (
-        <div className="rounded-xl border border-acc2/30 bg-acc2/10 p-3 text-xs text-acc2">
-          Долго не получается навести? Попробуй снять фото кнопкой ниже — по фото код находится надёжнее, чем на
-          живом видео.
+        <div className="rounded-xl border border-acc2/30 bg-acc2/10 px-3 py-2 text-[11px] leading-snug text-acc2">
+          Долго не получается? Сними фото кнопкой ниже — по фото код находится надёжнее.
         </div>
       )}
-      {warn && <div className="rounded-xl border border-warn/30 bg-warn/10 p-3 text-xs text-warn">{warn}</div>}
+      {warn && <div className="rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-[11px] leading-snug text-warn">{warn}</div>}
 
       <input
         ref={fileRef}
@@ -276,24 +275,25 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
         hidden
         onChange={(e) => e.target.files?.[0] && decodeFile(e.target.files[0])}
       />
-      <Btn variant="soft" className="w-full" disabled={busy} onClick={() => fileRef.current?.click()}>
+      <Btn variant="soft" size="sm" className="w-full" disabled={busy} onClick={() => fileRef.current?.click()}>
         {busy ? "Распознаём фото…" : "📸 Снять камерой телефона / выбрать фото"}
       </Btn>
 
       <div className="flex gap-2">
         <input
-          className="field"
+          className="field compact"
+          {...noSuggest}
           inputMode="numeric"
           placeholder="Или цифры под кодом: 4600494561238"
           value={manual}
           onChange={(e) => setManual(e.target.value.replace(/\D/g, ""))}
         />
-        <Btn className="shrink-0" disabled={manual.length < 6} onClick={() => accept(manual)}>
+        <Btn size="sm" className="shrink-0 px-4" disabled={manual.length < 6} onClick={() => accept(manual)}>
           Найти
         </Btn>
       </div>
 
-      <Btn variant="ghost" className="w-full" onClick={onClose}>
+      <Btn variant="ghost" size="sm" className="w-full" onClick={onClose}>
         Отмена
       </Btn>
     </div>

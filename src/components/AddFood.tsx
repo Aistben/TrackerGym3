@@ -248,63 +248,65 @@ export default function AddFood({
     const g = +grams || 0;
     const k = g / 100;
     return (
-      <div className="space-y-3">
-        <div className="card px-3 py-2.5">
-          <div className="truncate text-sm font-semibold">{picked.name}</div>
-          <div className="truncate text-[11px] text-mute">
+      <div className="space-y-2.5">
+        <div className="card px-3 py-2">
+          <div className="text-sm leading-snug font-semibold">{picked.name}</div>
+          <div className="mt-0.5 text-[11px] text-mute">
             {picked.brand ? picked.brand + " · " : ""}на 100 г: {picked.kcal} ккал · Б {picked.protein} · Ж {picked.fat} · У {picked.carbs}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
+            aria-label="Минус 10 грамм"
             onClick={() => setGrams(String(Math.max(0, (+grams || 0) - 10)))}
-            className="grid size-12 shrink-0 place-items-center rounded-xl border border-line bg-panel2 text-xl font-bold transition active:scale-95"
+            className="grid size-10 shrink-0 place-items-center rounded-xl border border-line bg-panel2 text-lg leading-none font-bold transition active:scale-95"
           >
-            −
+            <span className="leading-none">−</span>
           </button>
           <div className="relative min-w-0 flex-1">
             <input
-              className="field min-w-0 py-3.5 pr-14 text-center text-2xl font-bold"
+              className="field min-w-0 py-2 pr-12 text-center text-lg font-bold"
               {...numField}
               value={grams}
               onChange={(e) => setGrams(e.target.value.replace(",", "."))}
             />
-            <span className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-xs text-mute">г / мл</span>
+            <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[11px] text-mute">г / мл</span>
           </div>
           <button
             type="button"
+            aria-label="Плюс 10 грамм"
             onClick={() => setGrams(String((+grams || 0) + 10))}
-            className="grid size-12 shrink-0 place-items-center rounded-xl border border-line bg-panel2 text-xl font-bold transition active:scale-95"
+            className="grid size-10 shrink-0 place-items-center rounded-xl border border-line bg-panel2 text-lg leading-none font-bold transition active:scale-95"
           >
-            +
+            <span className="leading-none">+</span>
           </button>
         </div>
 
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-6 gap-1.5">
           {[30, 50, 100, 150, 200, 250].map((v) => (
             <button
               key={v}
               type="button"
               onClick={() => setGrams(String(v))}
-              className={`rounded-xl border py-2.5 text-sm font-semibold whitespace-nowrap transition active:scale-95 ${
+              className={`rounded-lg border py-1.5 text-xs font-semibold whitespace-nowrap transition active:scale-95 ${
                 +grams === v ? "border-acc bg-acc/20 text-acc" : "border-line bg-panel2 hover:border-acc2/60"
               }`}
             >
               {v}
             </button>
           ))}
-          {picked.portion && (
-            <button
-              type="button"
-              onClick={() => setGrams(String(picked.portion))}
-              className="col-span-2 rounded-xl border border-acc/40 bg-acc/10 py-2.5 text-sm font-semibold whitespace-nowrap text-acc active:scale-95"
-            >
-              порция · {picked.portion}
-            </button>
-          )}
         </div>
+        {picked.portion && (
+          <button
+            type="button"
+            onClick={() => setGrams(String(picked.portion))}
+            className="w-full rounded-lg border border-acc/40 bg-acc/10 py-1.5 text-xs font-semibold text-acc active:scale-95"
+          >
+            порция · {picked.portion} г
+          </button>
+        )}
 
         <div className="grid grid-cols-4 gap-1.5 text-center">
           {[
@@ -313,18 +315,18 @@ export default function AddFood({
             ["Жиры", round(picked.fat * k, 1)],
             ["Углев.", round(picked.carbs * k, 1)],
           ].map(([l, v]) => (
-            <div key={l as string} className="card px-1 py-2">
-              <div className="truncate text-base font-bold">{v}</div>
+            <div key={l as string} className="card px-1 py-1.5">
+              <div className="truncate text-sm font-bold">{v}</div>
               <div className="truncate text-[10px] text-mute">{l}</div>
             </div>
           ))}
         </div>
 
-        <div className="flex gap-2">
-          <Btn variant="soft" className="flex-1 py-3" onClick={() => setMode("search")}>
+        <div className="flex gap-2 pt-1">
+          <Btn variant="soft" className="flex-1" onClick={() => setMode("search")}>
             Назад
           </Btn>
-          <Btn className="flex-[2] py-3 text-base" disabled={g <= 0} onClick={confirmAdd}>
+          <Btn className="flex-[2]" disabled={g <= 0} onClick={confirmAdd}>
             Добавить
           </Btn>
         </div>
@@ -338,18 +340,18 @@ export default function AddFood({
   /* ---------- создание / редактирование продукта ---------- */
   if (mode === "form" || mode === "photo") {
     return (
-      <div className="space-y-3">
-        {notice && <div className="rounded-xl border border-warn/30 bg-warn/10 p-3 text-xs text-warn">{notice}</div>}
+      <div className="space-y-2">
+        {notice && <div className="rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-[11px] leading-snug text-warn">{notice}</div>}
         <Field label="Название">
-          <input className="field" {...noSuggest} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+          <input className="field compact" {...noSuggest} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2">
           <Field label="Бренд">
-            <input className="field" {...noSuggest} value={draft.brand} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} />
+            <input className="field compact" {...noSuggest} value={draft.brand} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} />
           </Field>
           <Field label="Штрихкод">
             <input
-              className="field"
+              className="field compact"
               {...numField}
               inputMode="numeric"
               value={draft.barcode}
@@ -363,8 +365,8 @@ export default function AddFood({
           </Btn>
         )}
         <LabelScanner onRead={(values) => setDraft((current) => ({ ...current, ...values }))} />
-        <div className="text-xs text-mute">Пищевая ценность на 100 г / 100 мл</div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="pt-0.5 text-[11px] text-mute">Пищевая ценность на 100 г / 100 мл</div>
+        <div className="grid grid-cols-2 gap-2">
           {(
             [
               ["Калории", "kcal"],
@@ -375,7 +377,7 @@ export default function AddFood({
           ).map(([label, key]) => (
             <Field key={key} label={label}>
               <input
-                className="field"
+                className="field compact"
                 {...numField}
                 value={draft[key]}
                 onChange={(e) => setDraft({ ...draft, [key]: e.target.value.replace(",", ".") })}
@@ -384,10 +386,10 @@ export default function AddFood({
           ))}
         </div>
         <div className="flex gap-2 pt-1">
-          <Btn variant="soft" className="flex-1" onClick={() => setMode("search")}>
+          <Btn variant="soft" size="sm" className="flex-1" onClick={() => setMode("search")}>
             Назад
           </Btn>
-          <Btn className="flex-1" disabled={!draft.name.trim() || !draft.kcal} onClick={saveDraft}>
+          <Btn size="sm" className="flex-1" disabled={!draft.name.trim() || !draft.kcal} onClick={saveDraft}>
             {editing ? "Сохранить" : "Сохранить в базу"}
           </Btn>
         </div>
@@ -401,31 +403,34 @@ export default function AddFood({
       <div className="flex gap-2">
         <input
           ref={searchRef}
-          className="field"
+          type="search"
+          className="field compact"
           placeholder="Найти продукт по названию…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
+          enterKeyHint="search"
           {...noSuggest}
         />
-        <IconBtn onClick={() => setMode("scan")} title="Дополнительно: сканировать штрихкод" size={44}>
-          <span className="text-lg">📷</span>
+        <IconBtn onClick={() => setMode("scan")} title="Дополнительно: сканировать штрихкод" size={38}>
+          <span className="text-base leading-none">📷</span>
         </IconBtn>
       </div>
 
       <Tabs
         value={lib}
         onChange={setLib}
+        fill={false}
         items={[
-          { key: "recent", label: `🕘 Недавние${recent.length ? ` · ${recent.length}` : ""}` },
-          { key: "base", label: `📦 Вся база · ${products.length}` },
+          { key: "recent", label: `Недавние${recent.length ? ` · ${recent.length}` : ""}` },
+          { key: "base", label: `База продуктов · ${products.length}` },
         ]}
       />
 
-      {notice && <div className="rounded-xl border border-warn/30 bg-warn/10 p-3 text-xs text-warn">{notice}</div>}
+      {notice && <div className="rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-[11px] leading-snug text-warn">{notice}</div>}
 
       <button
         onClick={openCreate}
-        className="w-full rounded-xl border border-dashed border-line px-3 py-2.5 text-sm text-mute transition hover:border-acc/50 hover:text-acc"
+        className="w-full rounded-xl border border-dashed border-line px-3 py-2 text-[13px] text-mute transition hover:border-acc/50 hover:text-acc"
       >
         + Создать свой продукт
       </button>
@@ -488,26 +493,29 @@ function Row({
   onDelete?: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-line bg-panel2/60 px-3 py-2.5 transition hover:border-acc2/60">
-      <button onClick={onClick} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+    <div className="flex items-center gap-1.5 rounded-xl border border-line bg-panel2/60 px-2.5 py-2 transition hover:border-acc2/60">
+      <button onClick={onClick} className="flex min-w-0 flex-1 items-center gap-2 text-left">
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">{p.name}</div>
-          <div className="truncate text-xs text-mute">
+          {/* Полное название — без обрезки, переносится на несколько строк */}
+          <div className="text-sm leading-snug font-medium break-words">{p.name}</div>
+          <div className="mt-0.5 text-[11px] leading-snug text-mute">
             {p.brand ? p.brand + " · " : ""}Б {p.protein} · Ж {p.fat} · У {p.carbs}
             {p.source === "user" ? " · моё" : online ? " · онлайн" : ""}
           </div>
         </div>
-        <div className="shrink-0 text-sm font-semibold text-acc">{p.kcal}</div>
-        <div className="shrink-0 text-[10px] whitespace-nowrap text-mute">ккал/100г</div>
+        <div className="shrink-0 text-right text-xs leading-tight font-semibold text-acc">
+          {p.kcal}
+          <div className="text-[9px] font-normal whitespace-nowrap text-mute">ккал/100г</div>
+        </div>
       </button>
       {p.source !== "base" && onEdit && (
-        <IconBtn onClick={onEdit} title="Изменить" size={30}>
-          <span className="text-xs">✏️</span>
+        <IconBtn onClick={onEdit} title="Изменить" size={26}>
+          <span className="text-[11px] leading-none">✏️</span>
         </IconBtn>
       )}
       {p.source !== "base" && onDelete && (
-        <IconBtn onClick={onDelete} title="Удалить из базы" size={30}>
-          <span className="text-xs">✕</span>
+        <IconBtn onClick={onDelete} title="Удалить из базы" size={26}>
+          <span className="text-[11px] leading-none">✕</span>
         </IconBtn>
       )}
     </div>
