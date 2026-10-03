@@ -39,11 +39,19 @@ test("продукты из «Магнита» лежат в конце базы
   assert.equal(sauce.brand, "Махеевъ");
   assert.equal(sauce.kcal, 461);
   assert.equal(sauce.fat, 50.5);
-  // Блок «Магнит» — в самом конце списка: значит, id ранее добавленных
-  // продуктов не сдвинулись и сохранённая база не перепуталась.
-  assert.deepEqual(
-    SEED_PRODUCTS.slice(-3).map((product) => product.name),
-    ["Кетчуп Томатный", "Кетчуп Шашлычный", "Майонез Провансаль 50.5%"],
+
+  // Первый продукт базы остался на своём месте: значит, новые позиции
+  // добавлены в конец и id ранее добавленных продуктов не сдвинулись.
+  const first = SEED_PRODUCTS.find((product) => product.id === "brand-0")!;
+  assert.equal(first.name, "Молоко ультрапастеризованное 2.5%");
+  assert.equal(first.brand, "Простоквашино");
+
+  const magnetBrands = new Set(["Махеевъ", "Heinz", "Слобода", "Astoria", "Mr. Ricco", "Pikador"]);
+  const tail = SEED_PRODUCTS.slice(-15);
+  assert.equal(tail.length, 15);
+  assert.ok(
+    tail.every((product) => magnetBrands.has(product.brand ?? "")),
+    tail.map((product) => `${product.brand} ${product.name}`).join(" | "),
   );
 });
 
