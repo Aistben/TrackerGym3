@@ -209,7 +209,7 @@ export default function DayView({
 
   return (
     <div className="space-y-4 pb-32" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} onTouchCancel={() => { touchStart.current = null; }}>
-      <div className="flex items-center gap-2">
+      <div className="mb-2 flex items-center gap-2">
         <IconBtn onClick={() => setDate(shiftDate(date, -1))} title="Предыдущий день" size={40}>
           ‹
         </IconBtn>
@@ -232,9 +232,8 @@ export default function DayView({
           </Btn>
         )}
       </div>
-      <div className="text-center text-[11px] text-mute">Свайп влево или вправо — другой день</div>
 
-      <div className="sticky top-0 z-40 pt-1 pb-2">
+      <div className="sticky top-0 z-40 mb-2 pt-1 pb-2">
       <div
         className="card flex items-center gap-4 p-4"
         style={{ background: "linear-gradient(145deg, #30235a, #241a40)" }}
