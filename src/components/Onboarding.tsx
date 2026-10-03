@@ -27,6 +27,7 @@ export default function Onboarding({ onDone }: { onDone: (p: Profile) => void })
       pace: goal === "maintain" ? 0 : +pace || 0.5,
       startDate: today(),
       calorieAdjust: 0,
+      calorieAdjustLocked: false,
       customMacros: null,
     }),
     [sex, age, height, weight, target, activity, goal, pace],

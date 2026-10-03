@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ActivityKey, AppState, Goal, Profile, Sex, Targets } from "../lib/types";
 import { ACTIVITY, GOALS, macroCalories, round } from "../lib/nutrition";
 import { emptyState } from "../lib/storage";
+import { formatAdjust, pushValue, undoTarget } from "../lib/adjust";
 import { Btn, Field, Sheet } from "./ui";
 
 export default function ProfileView({
@@ -21,6 +22,43 @@ export default function ProfileView({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const patch = (d: Partial<Profile>) => setState((s) => ({ ...s, profile: { ...s.profile!, ...d } }));
+
+  /* ---------- ручная корректировка калорий: замок и возврат ---------- */
+  const locked = !!p.calorieAdjustLocked;
+  const [history, setHistory] = useState<number[]>([]);
+  // Перетаскивание слайдера вызывает onChange десятки раз, а точку возврата
+  // нужна одна — на всё движение. Поэтому «сессия» жеста закрывается по паузе.
+  const dragging = useRef(false);
+  const dragTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(dragTimer.current), []);
+
+  function changeAdjust(next: number) {
+    if (next === p.calorieAdjust) return;
+    if (!dragging.current) {
+      setHistory((h) => pushValue(h, p.calorieAdjust));
+      dragging.current = true;
+    }
+    window.clearTimeout(dragTimer.current);
+    dragTimer.current = window.setTimeout(() => (dragging.current = false), 600);
+    patch({ calorieAdjust: next });
+  }
+
+  function undoAdjust() {
+    const target = undoTarget(history);
+    if (!target) return;
+    window.clearTimeout(dragTimer.current);
+    dragging.current = false;
+    setHistory(target.stack);
+    patch({ calorieAdjust: target.value });
+  }
+
+  function toggleAdjustLock() {
+    window.clearTimeout(dragTimer.current);
+    dragging.current = false;
+    patch({ calorieAdjustLocked: !locked });
+  }
+
+  const undoValue = history.length ? history[history.length - 1] : null;
 
   const macros = p.customMacros ?? { protein: targets.protein, fat: targets.fat, carbs: targets.carbs };
 
@@ -153,17 +191,50 @@ export default function ProfileView({
           <Mini label="TDEE" value={targets.tdee} />
           <Mini label="Цель" value={targets.calories} accent />
         </div>
-        <Field label={`Ручная корректировка: ${p.calorieAdjust > 0 ? "+" : ""}${p.calorieAdjust} ккал`}>
-          <input
-            type="range"
-            min={-500}
-            max={500}
-            step={25}
-            value={p.calorieAdjust}
-            onChange={(e) => patch({ calorieAdjust: +e.target.value })}
-            className="w-full accent-[#a855f7]"
-          />
+        <Field label={`Ручная корректировка: ${formatAdjust(p.calorieAdjust)}${locked ? " · зафиксировано" : ""}`}>
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min={-500}
+              max={500}
+              step={25}
+              value={p.calorieAdjust}
+              disabled={locked}
+              aria-label="Ручная корректировка калорий"
+              onChange={(e) => changeAdjust(+e.target.value)}
+              className="min-w-0 flex-1 accent-[#a855f7] disabled:cursor-not-allowed disabled:opacity-40"
+            />
+            <button
+              type="button"
+              onClick={toggleAdjustLock}
+              title={locked ? "Снять замок — значение снова можно менять" : "Поставить замок, чтобы значение не сбивалось"}
+              aria-label={locked ? "Снять замок с корректировки калорий" : "Зафиксировать корректировку калорий замком"}
+              aria-pressed={locked}
+              className={`grid size-10 shrink-0 place-items-center rounded-full border text-lg transition active:scale-90 ${
+                locked ? "border-acc/60 bg-acc/15 text-acc" : "border-line bg-panel2 text-mute hover:text-ink"
+              }`}
+            >
+              {locked ? "🔒" : "🔓"}
+            </button>
+          </div>
         </Field>
+
+        {undoValue !== null && (
+          <button
+            type="button"
+            onClick={undoAdjust}
+            title={`Вернуть ${formatAdjust(undoValue)}`}
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-line bg-panel2 px-3 py-2 text-xs text-mute transition hover:border-acc2/50 hover:text-ink active:scale-[0.99]"
+          >
+            ↩ Вернуть {formatAdjust(undoValue)}
+          </button>
+        )}
+
+        <p className="text-[11px] leading-snug text-mute">
+          {locked
+            ? "🔒 Слайдер зафиксирован: случайное касание значение не сдвинет. Снимите замок, чтобы снова менять."
+            : "🔓 Замок рядом со слайдером фиксирует значение, чтобы его не сбить случайным касанием. ↩ возвращает прежнее значение, 25 ккал — один шаг слайдера."}
+        </p>
 
         <label className="flex items-center gap-2 text-sm">
           <input
