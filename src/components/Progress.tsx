@@ -12,16 +12,35 @@ import {
   YAxis,
 } from "recharts";
 import type { AppState, Targets } from "../lib/types";
-import { GOALS, dateRange, dayTotals, etaDays, planWeight, round, shiftDate, shortDate, today, weekdayDate } from "../lib/nutrition";
+import {
+  GOALS,
+  dateRange,
+  daysBetween,
+  etaDays,
+  progressSeries,
+  round,
+  shiftDate,
+  shortDate,
+  today,
+} from "../lib/nutrition";
 import { Btn, Empty, Field, Select, Sheet, numField } from "./ui";
 
 const RANGES = [
-  { d: 7, label: "Неделя", hint: "вес по дням за 7 дней" },
+  { d: 7, label: "Неделя", hint: "вес и БЖУ по дням" },
   { d: 14, label: "2 недели", hint: "14 дней" },
   { d: 30, label: "Месяц", hint: "30 дней" },
   { d: 90, label: "3 месяца", hint: "90 дней" },
   { d: 365, label: "Год", hint: "12 месяцев" },
 ];
+
+/** Цвета линий графика: подписи легенды и сами линии читаются на тёмном фоне. */
+const LINE_COLORS = {
+  вес: "#a855f7",
+  план: "#2dd4bf",
+  белки: "#f59e0b",
+  жиры: "#f87171",
+  углеводы: "#60a5fa",
+};
 
 export default function Progress({
   state,
@@ -41,26 +60,6 @@ export default function Progress({
 
   const days = useMemo(() => dateRange(todayDate, range), [todayDate, range]);
 
-  const nutritionData = useMemo(() => {
-    const mealsByDate = new Map<string, typeof state.meals>();
-    for (const meal of state.meals) {
-      const meals = mealsByDate.get(meal.date) ?? [];
-      meals.push(meal);
-      mealsByDate.set(meal.date, meals);
-    }
-    return days.map((d) => {
-      const t = dayTotals(mealsByDate.get(d) ?? []);
-      return {
-        date: shortDate(d),
-        iso: d,
-        kcal: round(t.kcal),
-        protein: round(t.protein),
-        fat: round(t.fat),
-        carbs: round(t.carbs),
-      };
-    });
-  }, [days, state.meals]);
-
   // Якорь плана — последнее взвешивание на сегодня (актуальный вес),
   // чтобы линия плана всегда стартовала от реальности и шла к текущей цели.
   const anchor = useMemo(() => {
@@ -71,24 +70,41 @@ export default function Progress({
     return last ?? { date: profile.startDate, weight: profile.startWeight };
   }, [state.weights, profile.startDate, profile.startWeight, todayDate]);
 
-  const weightData = useMemo(() => {
-    const weightsByDate = new Map(state.weights.map((item) => [item.date, item.weight]));
-    return days
-      .filter((iso) => iso >= profile.startDate)
-      .map((iso) => ({
-        date: shortDate(iso),
-        day: weekdayDate(iso),
-        iso,
-        факт: weightsByDate.get(iso),
-        план: round(planWeight(profile, iso, anchor), 1),
-      }));
-  }, [days, state.weights, profile, anchor]);
+  /**
+   * Одна точка на день периода: вес (в дни взвешиваний) + плановая траектория
+   * и БЖУ из дневника. БЖУ рисуется линиями на правой оси — без них график
+   * показывал только вес, хотя человек ведёт ещё и еду.
+   */
+  const weightData = useMemo(
+    () => progressSeries({ days, meals: state.meals, weights: state.weights, profile, anchor }),
+    [days, state.meals, state.weights, profile, anchor],
+  );
 
-  const logged = nutritionData.filter((d) => d.kcal > 0);
+  const logged = weightData.filter((d) => d.kcal > 0);
   const avg = logged.length ? round(logged.reduce((s, d) => s + d.kcal, 0) / logged.length) : 0;
-  const avgP = logged.length ? round(logged.reduce((s, d) => s + d.protein, 0) / logged.length) : 0;
+  const avgP = logged.length
+    ? round(logged.reduce((s, d) => s + (d.белки ?? 0), 0) / logged.length)
+    : 0;
   const eta = etaDays(profile, currentWeight);
   const delta = round(currentWeight - profile.startWeight, 1);
+
+  const weighInsInWindow = weightData.filter((d) => d.факт != null).length;
+  const lastWeighIn = useMemo(
+    () =>
+      [...state.weights]
+        .filter((item) => item.date <= todayDate)
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .at(-1) ?? null,
+    [state.weights, todayDate],
+  );
+  // Взвешивание могло быть раньше выбранного периода: тогда линия веса пропадает,
+  // и это выглядит как «график сломался». Предлагаем одним касанием расширить период.
+  const widerRange = useMemo(() => {
+    if (!lastWeighIn) return null;
+    const need = daysBetween(lastWeighIn.date, todayDate) + 1;
+    const fit = RANGES.find((item) => item.d >= need) ?? RANGES[RANGES.length - 1];
+    return fit.d > range ? fit : null;
+  }, [lastWeighIn, todayDate, range]);
 
   return (
     <div className="space-y-4 pb-28">
@@ -102,7 +118,7 @@ export default function Progress({
       <div className="card p-4">
         <div className="mb-3 space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="min-w-0 truncate text-sm font-semibold">Вес по дням</h3>
+            <h3 className="min-w-0 truncate text-sm font-semibold">Вес и БЖУ по дням</h3>
             <span className="shrink-0 text-[11px] text-mute">{state.weights.length} записей</span>
           </div>
           <div className="flex items-stretch gap-2">
@@ -116,17 +132,41 @@ export default function Progress({
               ➕ Добавить вес
             </Btn>
           </div>
-          <p className="text-[11px] text-mute">Проведи пальцем по графику, чтобы увидеть день</p>
+          <p className="text-[11px] text-mute">
+            Фиолетовая линия — вес, пунктир — план (левая шкала). Цветные линии — белки, жиры и углеводы из дневника
+            (правая шкала). Проведи пальцем по графику, чтобы увидеть день.
+          </p>
         </div>
+
+        {weighInsInWindow === 0 && widerRange && lastWeighIn && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-[11px] leading-snug text-warn">
+            <span className="min-w-0 flex-1">
+              В этом периоде нет взвешиваний — последнее {shortDate(lastWeighIn.date)} (
+              {daysBetween(lastWeighIn.date, todayDate)} дн. назад), поэтому линия веса пустая.
+            </span>
+            <button
+              type="button"
+              onClick={() => setRange(widerRange.d)}
+              className="shrink-0 rounded-lg border border-warn/40 bg-warn/10 px-2 py-1 font-semibold whitespace-nowrap"
+            >
+              Показать «{widerRange.label}»
+            </button>
+          </div>
+        )}
+        {weighInsInWindow === 1 && (
+          <div className="mb-3 rounded-xl border border-line bg-panel2/60 px-3 py-2 text-[11px] leading-snug text-mute">
+            В периоде пока одно взвешивание — линия веса появится после второго. Точка уже стоит на графике.
+          </div>
+        )}
         {state.weights.length === 0 ? (
           <Empty icon="⚖️" text="Добавь первое взвешивание — график начнёт строиться" />
         ) : (
-          <ResponsiveContainer width="100%" height={240}>
-            <ComposedChart data={weightData} margin={{ top: 5, right: 10, left: -18, bottom: 0 }}>
+          <ResponsiveContainer width="100%" height={260}>
+            <ComposedChart data={weightData} margin={{ top: 5, right: 0, left: -18, bottom: 0 }}>
               <defs>
                 <linearGradient id="gw" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#a855f7" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#a855f7" stopOpacity={0} />
+                  <stop offset="0%" stopColor={LINE_COLORS.вес} stopOpacity={0.35} />
+                  <stop offset="100%" stopColor={LINE_COLORS.вес} stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid stroke="#3b2d60" vertical={false} />
@@ -136,13 +176,54 @@ export default function Progress({
                 interval={range <= 7 ? 0 : range <= 14 ? 1 : "preserveStartEnd"}
                 minTickGap={range <= 14 ? 0 : 24}
               />
-              <YAxis yAxisId="weight" tick={{ fontSize: 10, fill: "#b0a2cf" }} domain={["dataMin - 1.5", "dataMax + 1.5"]} />
+              <YAxis
+                yAxisId="weight"
+                tick={{ fontSize: 10, fill: "#b0a2cf" }}
+                domain={["dataMin - 1.5", "dataMax + 1.5"]}
+              />
+              <YAxis
+                yAxisId="macro"
+                orientation="right"
+                tick={{ fontSize: 10, fill: "#b0a2cf" }}
+                domain={[0, "dataMax + 10"]}
+                width={30}
+              />
               <Tooltip contentStyle={tipStyle} labelStyle={{ color: "#b0a2cf" }} />
-              <ReferenceLine yAxisId="weight" y={profile.targetWeight} stroke="#2dd4bf" strokeDasharray="4 4" />
-              <Line yAxisId="weight" type="monotone" dataKey="план" name="План от текущего веса, кг" stroke="#2dd4bf" strokeWidth={1.6} strokeDasharray="5 5" dot={false} />
-              <Area yAxisId="weight" type="monotone" dataKey="факт" name="Вес, кг" stroke="none" fill="url(#gw)" connectNulls />
-              <Line yAxisId="weight" type="monotone" dataKey="факт" name="Вес, кг" stroke="#a855f7" strokeWidth={2.4} dot={{ r: 3, fill: "#a855f7" }} connectNulls />
-              <Legend verticalAlign="bottom" height={20} wrapperStyle={{ fontSize: 11, color: "#b0a2cf" }} />
+              <ReferenceLine yAxisId="weight" y={profile.targetWeight} stroke={LINE_COLORS.план} strokeDasharray="4 4" />
+              <Line
+                yAxisId="weight"
+                type="monotone"
+                dataKey="план"
+                name="План, кг"
+                stroke={LINE_COLORS.план}
+                strokeWidth={1.6}
+                strokeDasharray="5 5"
+                dot={false}
+              />
+              <Area
+                yAxisId="weight"
+                type="monotone"
+                dataKey="факт"
+                name="Вес, кг"
+                legendType="none"
+                stroke="none"
+                fill="url(#gw)"
+                connectNulls
+              />
+              <Line
+                yAxisId="weight"
+                type="monotone"
+                dataKey="факт"
+                name="Вес, кг"
+                stroke={LINE_COLORS.вес}
+                strokeWidth={2.4}
+                dot={{ r: 3, fill: LINE_COLORS.вес }}
+                connectNulls
+              />
+              <Line yAxisId="macro" type="linear" dataKey="белки" name="Белки, г" stroke={LINE_COLORS.белки} strokeWidth={2} dot={false} connectNulls />
+              <Line yAxisId="macro" type="linear" dataKey="жиры" name="Жиры, г" stroke={LINE_COLORS.жиры} strokeWidth={2} dot={false} connectNulls />
+              <Line yAxisId="macro" type="linear" dataKey="углеводы" name="Углеводы, г" stroke={LINE_COLORS.углеводы} strokeWidth={2} dot={false} connectNulls />
+              <Legend verticalAlign="bottom" height={34} wrapperStyle={{ fontSize: 11, color: "#b0a2cf" }} />
             </ComposedChart>
           </ResponsiveContainer>
         )}
