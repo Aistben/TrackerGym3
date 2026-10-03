@@ -50,6 +50,11 @@ export default function AddFood({
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState<Product | null>(null);
+  const [correctionSearchOpen, setCorrectionSearchOpen] = useState(false);
+  const [correctionQuery, setCorrectionQuery] = useState("");
+  const [correctionProducts, setCorrectionProducts] = useState<Product[]>([]);
+  const [correctionLoading, setCorrectionLoading] = useState(false);
+  const [refreshingBarcode, setRefreshingBarcode] = useState(false);
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
   const [draft, setDraft] = useState({ ...blankDraft });
   const searchRef = useRef<HTMLInputElement>(null);
@@ -169,11 +174,73 @@ export default function AddFood({
     };
   }, [q, mode, lib, products]);
 
+  // Отдельный интернет-поиск из карточки порции: если штрихкод совпал с
+  // неправильной записью, можно найти продукт по точному названию с упаковки.
+  useEffect(() => {
+    const query = correctionQuery.trim();
+    if (!correctionSearchOpen || mode !== "portion" || query.length < 2) {
+      setCorrectionProducts([]);
+      setCorrectionLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setCorrectionLoading(true);
+      try {
+        const found = await searchOnline(query, controller.signal);
+        if (!controller.signal.aborted) setCorrectionProducts(found);
+      } catch {
+        if (!controller.signal.aborted) setCorrectionProducts([]);
+      } finally {
+        if (!controller.signal.aborted) setCorrectionLoading(false);
+      }
+    }, 400);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [correctionQuery, correctionSearchOpen, mode]);
+
   function pick(p: Product, persist = false) {
     if (persist) onSaveProduct(p);
     setPicked(p);
     setGrams(String(p.portion ?? 100));
     setMode("portion");
+  }
+
+  function pickCorrection(p: Product) {
+    // Сохраняем интернет-карточку и заменяем запись с тем же штрихкодом.
+    onSaveProduct(p);
+    setPicked(p);
+    setCorrectionSearchOpen(false);
+    setCorrectionProducts([]);
+    setNotice(`«${p.name}» загружен из Open Food Facts и сохранён в базу.`);
+  }
+
+  async function refreshPickedBarcode() {
+    if (!picked?.barcode || refreshingBarcode) return;
+    setRefreshingBarcode(true);
+    setNotice("Проверяем штрихкод в Open Food Facts…");
+    try {
+      const lookup = await lookupBarcode(picked.barcode);
+      if (lookup.product) {
+        onSaveProduct(lookup.product);
+        setPicked(lookup.product);
+        setNotice("Карточка обновлена из Open Food Facts и сохранена в базу. Проверь название и БЖУ.");
+      } else {
+        setNotice(
+          lookup.status === "offline"
+            ? "Нет связи с Open Food Facts. Проверь интернет или найди продукт по названию."
+            : "В Open Food Facts не нашлась карточка по этому штрихкоду. Попробуй поиск по названию.",
+        );
+      }
+    } catch {
+      setNotice("Не удалось связаться с Open Food Facts. Проверь интернет и попробуй ещё раз.");
+    } finally {
+      setRefreshingBarcode(false);
+    }
   }
 
   function openCreate() {
@@ -313,11 +380,61 @@ export default function AddFood({
     const k = g / 100;
     return (
       <div className="space-y-2.5">
+        {notice && <div className="rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-[11px] leading-snug text-warn">{notice}</div>}
         <div className="card px-3 py-2">
           <div className="text-sm leading-snug font-semibold">{picked.name}</div>
           <div className="mt-0.5 text-[11px] text-mute">
             {picked.brand ? picked.brand + " · " : ""}на 100 г: {picked.kcal} ккал · Б {picked.protein} · Ж {picked.fat} · У {picked.carbs}
           </div>
+          {picked.source === "off" && <div className="mt-1 text-[10px] text-acc">Данные из Open Food Facts</div>}
+        </div>
+
+        {picked.barcode && (
+          <Btn variant="soft" size="sm" className="w-full" disabled={refreshingBarcode} onClick={refreshPickedBarcode}>
+            {refreshingBarcode ? "Проверяем штрихкод в интернете…" : "🔄 Обновить данные по штрихкоду"}
+          </Btn>
+        )}
+
+        <div className="rounded-xl border border-line bg-panel2/50 p-2.5">
+          <Btn
+            variant="soft"
+            size="sm"
+            className="w-full"
+            onClick={() => {
+              setCorrectionSearchOpen((open) => !open);
+              setCorrectionProducts([]);
+              setCorrectionQuery("");
+              setNotice(null);
+            }}
+          >
+            {correctionSearchOpen ? "Скрыть поиск" : "❌ Не тот продукт? Найти по названию"}
+          </Btn>
+          {correctionSearchOpen && (
+            <div className="mt-2 space-y-2">
+              <p className="text-[11px] leading-snug text-mute">
+                Введи название соуса и бренд с упаковки. Найденную карточку можно сразу сохранить в свою базу.
+              </p>
+              <input
+                className="field compact"
+                {...noSuggest}
+                autoFocus
+                placeholder="Например: томатный соус, бренд"
+                value={correctionQuery}
+                onChange={(e) => setCorrectionQuery(e.target.value)}
+              />
+              {correctionLoading && <div className="py-1 text-center text-xs text-mute">Ищем в Open Food Facts…</div>}
+              {!correctionLoading && correctionQuery.trim().length >= 2 && !correctionProducts.length && (
+                <div className="py-1 text-center text-xs text-mute">Ничего не нашлось. Проверь название или попробуй короче.</div>
+              )}
+              {correctionProducts.length > 0 && (
+                <div className="max-h-56 space-y-1.5 overflow-y-auto overscroll-contain">
+                  {correctionProducts.map((p) => (
+                    <Row key={p.id} p={p} online onClick={() => pickCorrection(p)} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5">

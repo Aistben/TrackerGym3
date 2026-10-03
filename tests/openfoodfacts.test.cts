@@ -66,6 +66,18 @@ test("mapProduct: без названия карточка не создаётс
   assert.equal(mapProduct(null), null);
 });
 
+test("mapProduct: рассчитывает ккал из БЖУ, если энергия не указана", () => {
+  const p = mapProduct({
+    code: "1234567890128",
+    product_name_ru: "Томатный соус",
+    nutriments: { proteins_100g: 2, fat_100g: 1, carbohydrates_100g: 8 },
+  })!;
+  assert.equal(p.kcal, 49); // 2×4 + 1×9 + 8×4
+  assert.equal(p.protein, 2);
+  assert.equal(p.fat, 1);
+  assert.equal(p.carbs, 8);
+});
+
 test("lookupVariants: добавленный ведущий ноль не ломает поиск", () => {
   const variants = lookupVariants("04600494561238");
   assert.ok(variants.includes("4600494561238"));
