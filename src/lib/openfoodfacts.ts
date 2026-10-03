@@ -58,6 +58,15 @@ export function mapProduct(p: any): Product | null {
 }
 
 /**
+ * В Open Food Facts много карточек, где заполнено только название (и нередко
+ * чужое — например, «Mayonnaise Sauce Käse» для соуса «Махеевъ»). Такая карточка
+ * «находится», но БЖУ в ней нет: показывать её как готовый продукт нельзя.
+ */
+export function hasNutrition(product: Product): boolean {
+  return product.kcal > 0 || product.protein > 0 || product.fat > 0 || product.carbs > 0;
+}
+
+/**
  * Ответ разбираем без window/таймеров — так это тестируется в node.
  * timeoutMs обрывает запрос: интернет может быть медленным, но ждать
  * «вечность» и оставлять сканер в подвешенном состоянии нельзя.
@@ -151,7 +160,20 @@ export async function lookupBarcodeResult(barcode: string, timeoutMs = 7000): Pr
   const markAnswered = () => {
     answered = true;
   };
-  const attempts = API_HOSTS.flatMap((host) => variants.map((code) => fetchOne(host, code, markAnswered, timeoutMs)));
+  // Карточка без БЖУ — тоже находка, но подставлять её как готовые данные
+  // нельзя: ждём вариант с БЖУ, а «пустую» держим в резерве до конца.
+  let weak: Product | null = null;
+  const attempts = API_HOSTS.flatMap((host) =>
+    variants.map((code) =>
+      fetchOne(host, code, markAnswered, timeoutMs)
+        .catch(() => null)
+        .then((product) => {
+          if (product && hasNutrition(product)) return product;
+          if (product && !weak) weak = product;
+          return null;
+        }),
+    ),
+  );
   const direct = await firstFound(attempts);
   if (direct) return { status: "ok", product: direct };
 
@@ -168,8 +190,13 @@ export async function lookupBarcodeResult(barcode: string, timeoutMs = 7000): Pr
     const found = (data?.products ?? [])
       .map(mapProduct)
       .find((p: Product | null) => p?.barcode && variants.includes(normalizeGtin(p.barcode)));
-    if (found) return { status: "ok", product: found };
+    if (!found) continue;
+    if (hasNutrition(found)) return { status: "ok", product: found };
+    if (!weak) weak = found;
   }
+  // Нашлась только карточка без БЖУ — отдаём её, чтобы приложение показало
+  // название с упаковки и попросило вписать цифры (а не «не найдено»).
+  if (weak) return { status: "ok", product: weak };
   return { status: answered ? "not-found" : "offline", product: null };
 }
 

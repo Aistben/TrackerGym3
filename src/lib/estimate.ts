@@ -172,6 +172,23 @@ export const TYPICAL_FOODS: TypicalFood[] = [
   { name: "Семечки", kcal: 580, protein: 21, fat: 51, carbs: 12, portion: 30, group: "орехи и снеки", aliases: ["семена подсолнечника"] },
   { name: "Чипсы", kcal: 530, protein: 6, fat: 34, carbs: 52, portion: 50, group: "орехи и снеки", aliases: ["чипсы картофельные"] },
   { name: "Протеиновый батончик", kcal: 350, protein: 30, fat: 10, carbs: 35, portion: 60, group: "орехи и снеки", aliases: ["протеин батончик", "батончик"] },
+
+  // ---------- соусы и приправы ----------
+  // Самый частый вопрос «что за соус я налил» — и самая разная жирность
+  // у одинаковых названий, поэтому берём типовые значения для категории.
+  { name: "Майонез", kcal: 620, protein: 0.5, fat: 67, carbs: 2.6, portion: 15, group: "соусы и приправы", aliases: ["майонез провансаль", "провансаль"] },
+  { name: "Майонез лёгкий 25%", kcal: 250, protein: 0.5, fat: 25, carbs: 6, portion: 15, group: "соусы и приправы", aliases: ["майонез легкий"] },
+  { name: "Майонезный соус 50%", kcal: 460, protein: 0.5, fat: 50, carbs: 2, portion: 15, group: "соусы и приправы", aliases: ["соус майонезный"] },
+  { name: "Сырный соус", kcal: 420, protein: 1, fat: 44, carbs: 5, portion: 15, group: "соусы и приправы", aliases: ["чиз соус", "сырный соус махеев"] },
+  { name: "Соус сливочно-чесночный", kcal: 300, protein: 1, fat: 30, carbs: 6, portion: 15, group: "соусы и приправы", aliases: ["чесночный соус", "сливочно чесночный"] },
+  { name: "Соус тар-тар", kcal: 262, protein: 1, fat: 26, carbs: 6, portion: 15, group: "соусы и приправы", aliases: ["тартар", "тар тар"] },
+  { name: "Соус цезарь", kcal: 400, protein: 1.5, fat: 42, carbs: 4, portion: 15, group: "соусы и приправы", aliases: ["цезарь соус"] },
+  { name: "Сметанный соус с грибами", kcal: 218, protein: 1, fat: 22, carbs: 4, portion: 15, group: "соусы и приправы", aliases: ["грибной соус", "соус с грибами"] },
+  { name: "Соус барбекю", kcal: 128, protein: 0.8, fat: 0.5, carbs: 30, portion: 15, group: "соусы и приправы", aliases: ["барбекю"] },
+  { name: "Кетчуп", kcal: 95, protein: 1.3, fat: 0.2, carbs: 22, portion: 15, group: "соусы и приправы", aliases: ["кетчуп томатный"] },
+  { name: "Томатный соус", kcal: 59, protein: 1.5, fat: 0.5, carbs: 12, portion: 20, group: "соусы и приправы", aliases: ["соус томатный", "итальянский соус"] },
+  { name: "Соевый соус", kcal: 56, protein: 6, fat: 0, carbs: 8, portion: 10, group: "соусы и приправы", aliases: ["соевый"] },
+  { name: "Горчица", kcal: 105, protein: 5, fat: 5, carbs: 10, portion: 10, group: "соусы и приправы", aliases: ["горчица столовая"] },
 ];
 
 /** Слова, которые не помогают отличить одно блюдо от другого. */
