@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { MealEntry, Product } from "../lib/types";
 import { round } from "../lib/nutrition";
 import { uid } from "../lib/storage";
-import { lookupBarcode, searchOnline } from "../lib/openfoodfacts";
+import { hasNutrition, lookupBarcode, searchOnline } from "../lib/openfoodfacts";
 import { sameBarcode } from "../lib/barcode";
+import { searchProducts } from "../lib/search";
 import { estimateFromProducts, estimateFromTable, estimateToDraft, suggestFoods, type Estimate } from "../lib/estimate";
 import { Btn, Empty, Field, IconBtn, Sheet, Tabs, noSuggest, numField } from "./ui";
 import Scanner from "./Scanner";
@@ -132,14 +133,15 @@ export default function AddFood({
 
   const base = useMemo(() => [...products].sort((a, b) => (a.source === "base" ? 1 : 0) - (b.source === "base" ? 1 : 0)), [products]);
 
-  const list = useMemo(() => {
-    const s = q.trim().toLowerCase();
+  // Поиск по словам в любом порядке («сырный соус махеев»), с «ё/ъ», опечатками
+  // и штрихкодом. Раньше строка искалась целиком и такие запросы не находились.
+  const found = useMemo(() => {
     const source = lib === "recent" ? recent : base;
-    const filtered = s
-      ? source.filter((p) => (p.name + " " + (p.brand ?? "") + " " + (p.barcode ?? "")).toLowerCase().includes(s))
-      : source;
-    return filtered.slice(0, 60);
+    const s = q.trim();
+    if (!s) return { items: source.slice(0, 60), fuzzy: false };
+    return searchProducts(source, s, 60);
   }, [lib, recent, base, q]);
+  const list = found.items;
 
   // онлайн-поиск по OpenFoodFacts с дебаунсом — только пока открыта вкладка «База»
   const abort = useRef<AbortController | null>(null);
@@ -219,16 +221,38 @@ export default function AddFood({
     setNotice(`«${p.name}» загружен из Open Food Facts и сохранён в базу.`);
   }
 
+  /**
+   * В Open Food Facts карточка бывает «пустой»: есть название (иногда чужое —
+   * «Mayonnaise Sauce Käse» вместо соуса «Махеевъ»), а БЖУ нет. Показываем форму
+   * с подставленным названием: человек впишет цифры с упаковки, и в следующий раз
+   * штрихкод найдётся уже в своей базе.
+   */
+  function openIncompleteCard(code: string, product: Product) {
+    setEditing(null);
+    setDraft({
+      ...blankDraft,
+      name: product.name,
+      brand: product.brand ?? "",
+      barcode: product.barcode ?? code,
+    });
+    setNotice(
+      `Карточка «${product.name}» по коду ${code} есть в Open Food Facts, но без БЖУ. Впиши данные с упаковки — сохраним в базу.`,
+    );
+    setMode("form");
+  }
+
   async function refreshPickedBarcode() {
     if (!picked?.barcode || refreshingBarcode) return;
     setRefreshingBarcode(true);
     setNotice("Проверяем штрихкод в Open Food Facts…");
     try {
       const lookup = await lookupBarcode(picked.barcode);
-      if (lookup.product) {
+      if (lookup.product && hasNutrition(lookup.product)) {
         onSaveProduct(lookup.product);
         setPicked(lookup.product);
         setNotice("Карточка обновлена из Open Food Facts и сохранена в базу. Проверь название и БЖУ.");
+      } else if (lookup.product) {
+        setNotice("В Open Food Facts карточка без БЖУ — оставил текущие значения. Цифры можно поправить кнопкой ✏️.");
       } else {
         setNotice(
           lookup.status === "offline"
@@ -278,9 +302,13 @@ export default function AddFood({
     try {
       const lookup = await lookupBarcode(code);
       status = lookup.status;
-      if (lookup.product) {
+      if (lookup.product && hasNutrition(lookup.product)) {
         setNotice(null);
         pick(lookup.product, true);
+        return;
+      }
+      if (lookup.product) {
+        openIncompleteCard(code, lookup.product);
         return;
       }
     } catch {
@@ -325,7 +353,11 @@ export default function AddFood({
         carbs: String(found.carbs),
         portion: found.portion ? String(found.portion) : current.portion,
       }));
-      setNotice("Название, бренд, штрихкод и БЖУ заполнены — проверь данные перед сохранением.");
+      setNotice(
+        hasNutrition(found)
+          ? "Название, бренд, штрихкод и БЖУ заполнены — проверь данные перед сохранением."
+          : "Карточка нашлась, но БЖУ в ней нет — впиши цифры с упаковки.",
+      );
     } catch {
       setNotice("Не удалось получить данные по штрихкоду. Заполни карточку вручную.");
     } finally {
@@ -712,13 +744,20 @@ export default function AddFood({
             })()}
           </button>
         )}
+        {found.fuzzy && list.length > 0 && (
+          <div className="rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-[11px] leading-snug text-warn">
+            Точного совпадения нет — ниже похожие продукты. Проверь название и БЖУ.
+          </div>
+        )}
         {list.map((p) => (
           <Row key={p.id} p={p} onClick={() => pick(p)} onEdit={() => openEdit(p)} onDelete={() => setDeleteProduct(p)} />
         ))}
         {!list.length && lib === "recent" && !loading && (
           <Empty icon="🕘" text="Пока нет недавних продуктов — добавь что-нибудь из базы" />
         )}
-        {!list.length && lib === "base" && !online.length && !loading && <Empty icon="🔍" text="Ничего не нашлось" />}
+        {!list.length && lib === "base" && !online.length && !loading && (
+          <Empty icon="🔍" text="Ничего не нашлось — проверь название, отсканируй штрихкод или оцени БЖУ по названию" />
+        )}
 
         {lib === "base" && (loading || online.length > 0) && (
           <div className="pt-3 text-xs font-medium tracking-wide text-mute uppercase">

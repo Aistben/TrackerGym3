@@ -1,4 +1,4 @@
-import type { ActivityKey, Goal, Macros, Meal, MealEntry, Profile, Targets } from "./types";
+import type { ActivityKey, Goal, Macros, Meal, MealEntry, Profile, Targets, WeighIn } from "./types";
 
 export const ACTIVITY: Record<ActivityKey, { label: string; hint: string; k: number }> = {
   sedentary: { label: "Минимальная", hint: "сидячая работа, без тренировок", k: 1.2 },
@@ -157,6 +157,44 @@ export function planWeight(profile: Profile, iso: string, anchor?: WeightAnchor)
   // назад (до якоря) — просто продлеваем ту же траекторию.
   if (n <= 0) return w;
   return sign < 0 ? Math.max(w, profile.targetWeight) : Math.min(w, profile.targetWeight);
+}
+
+/** Точка графика веса: одна на каждый день периода. */
+export type WeightPoint = {
+  iso: string;
+  date: string;
+  day: string;
+  /** вес, кг — только в дни взвешиваний, иначе линия рвётся */
+  факт?: number;
+  /** плановая траектория веса, кг — есть в каждой точке */
+  план: number;
+};
+
+/**
+ * Данные для графика веса. Вес есть только в дни взвешиваний: пропуски
+ * recharts просто не рисует, а линия плана идёт сплошной.
+ */
+export function weightSeries({
+  days,
+  weights,
+  profile,
+  anchor,
+}: {
+  days: string[];
+  weights: WeighIn[];
+  profile: Profile;
+  anchor?: WeightAnchor;
+}): WeightPoint[] {
+  const weightsByDate = new Map(weights.map((item) => [item.date, item.weight]));
+  return days
+    .filter((iso) => iso >= profile.startDate)
+    .map((iso) => ({
+      iso,
+      date: shortDate(iso),
+      day: weekdayDate(iso),
+      факт: weightsByDate.get(iso),
+      план: round(planWeight(profile, iso, anchor), 1),
+    }));
 }
 
 export function etaDays(profile: Profile, currentWeight: number) {
