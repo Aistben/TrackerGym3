@@ -12,13 +12,15 @@ import {
   YAxis,
 } from "recharts";
 import type { AppState, Targets } from "../lib/types";
-import { GOALS, dayTotals, etaDays, planWeight, round, shiftDate, shortDate, today } from "../lib/nutrition";
-import { Btn, Empty, Field, Sheet, Tabs, numField } from "./ui";
+import { GOALS, dayTotals, etaDays, planWeight, round, shiftDate, shortDate, today, weekdayDate } from "../lib/nutrition";
+import { Btn, Empty, Field, Select, Sheet, numField } from "./ui";
 
 const RANGES = [
-  { d: 14, label: "2 нед" },
-  { d: 30, label: "1 мес" },
-  { d: 90, label: "3 мес" },
+  { d: 7, label: "Неделя", hint: "вес по дням за 7 дней" },
+  { d: 14, label: "2 недели", hint: "14 дней" },
+  { d: 30, label: "Месяц", hint: "30 дней" },
+  { d: 90, label: "3 месяца", hint: "90 дней" },
+  { d: 365, label: "Год", hint: "12 месяцев" },
 ];
 
 export default function Progress({
@@ -32,7 +34,7 @@ export default function Progress({
   targets: Targets;
   currentWeight: number;
 }) {
-  const [range, setRange] = useState(30);
+  const [range, setRange] = useState(7);
   const [weighOpen, setWeighOpen] = useState(false);
   const profile = state.profile!;
 
@@ -76,13 +78,14 @@ export default function Progress({
   const weightData = useMemo(() => {
     const from = shiftDate(today(), -(range - 1));
     const weightsByDate = new Map(state.weights.map((item) => [item.date, item.weight]));
-    const list: { date: string; iso: string; факт?: number; план: number }[] = [];
+    const list: { date: string; day: string; iso: string; факт?: number; план: number }[] = [];
     const startIso = profile.startDate < from ? from : profile.startDate;
     let iso = startIso;
     const end = shiftDate(today(), 14);
     while (iso <= end) {
       list.push({
         date: shortDate(iso),
+        day: weekdayDate(iso),
         iso,
         факт: weightsByDate.get(iso),
         план: round(planWeight(profile, iso, anchor), 1),
@@ -111,15 +114,19 @@ export default function Progress({
         <div className="mb-3 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <h3 className="min-w-0 truncate text-sm font-semibold">Вес по дням</h3>
-            <Btn variant="soft" size="sm" className="shrink-0 whitespace-nowrap" onClick={() => setWeighOpen(true)}>
-              + Вес
+            <span className="shrink-0 text-[11px] text-mute">{state.weights.length} записей</span>
+          </div>
+          <div className="flex items-stretch gap-2">
+            <Select
+              className="min-w-0 flex-1"
+              value={range}
+              onChange={setRange}
+              options={RANGES.map((r) => ({ key: r.d, label: r.label, hint: r.hint }))}
+            />
+            <Btn variant="soft" size="sm" className="shrink-0 self-stretch whitespace-nowrap px-3" onClick={() => setWeighOpen(true)}>
+              ➕ Добавить вес
             </Btn>
           </div>
-          <Tabs
-            value={range}
-            onChange={setRange}
-            items={RANGES.map((r) => ({ key: r.d, label: r.label }))}
-          />
           <p className="text-[11px] text-mute">Проведи пальцем по графику, чтобы увидеть день</p>
         </div>
         {state.weights.length === 0 ? (
@@ -134,7 +141,12 @@ export default function Progress({
                 </linearGradient>
               </defs>
               <CartesianGrid stroke="#3b2d60" vertical={false} />
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#b0a2cf" }} interval="preserveStartEnd" minTickGap={24} />
+              <XAxis
+                dataKey={range <= 14 ? "day" : "date"}
+                tick={{ fontSize: 10, fill: "#b0a2cf" }}
+                interval={range <= 14 ? 0 : "preserveStartEnd"}
+                minTickGap={range <= 14 ? 0 : 24}
+              />
               <YAxis yAxisId="weight" tick={{ fontSize: 10, fill: "#b0a2cf" }} domain={["dataMin - 1.5", "dataMax + 1.5"]} />
               <Tooltip contentStyle={tipStyle} labelStyle={{ color: "#b0a2cf" }} />
               <ReferenceLine yAxisId="weight" y={profile.targetWeight} stroke="#2dd4bf" strokeDasharray="4 4" />

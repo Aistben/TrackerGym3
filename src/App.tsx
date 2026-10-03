@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { usePersistentState } from "./lib/storage";
 import { computeTargets, today } from "./lib/nutrition";
 import Onboarding from "./components/Onboarding";
@@ -28,6 +28,15 @@ function IconProgress({ active }: { active: boolean }) {
   );
 }
 
+function IconScan({ active }: { active: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth={active ? 2.3 : 1.9} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 7V5.5A1.5 1.5 0 0 1 5.5 4H7M17 4h1.5A1.5 1.5 0 0 1 20 5.5V7M20 17v1.5a1.5 1.5 0 0 1-1.5 1.5H17M7 20H5.5A1.5 1.5 0 0 1 4 18.5V17" />
+      <path d="M8 8v8M11 8v8M14.5 8v8M17 8v8" />
+    </svg>
+  );
+}
+
 function IconProfile({ active }: { active: boolean }) {
   return (
     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth={active ? 2.3 : 1.9} strokeLinecap="round" strokeLinejoin="round">
@@ -47,7 +56,7 @@ export default function App() {
   const [state, setState] = usePersistentState();
   const [tab, setTab] = useState<Tab>("day");
   const [date, setDate] = useState(today());
-  const [photoRequest, setPhotoRequest] = useState(0);
+  const [scanRequest, setScanRequest] = useState(0);
 
   const currentWeight = useMemo(() => {
     if (!state.profile) return 0;
@@ -73,10 +82,15 @@ export default function App() {
     );
   }
 
-  function openPhotoCapture() {
+  /** Открыть сканер штрихкода: просим дневник открыть добавление сразу в режиме сканера. */
+  function openBarcodeScanner() {
     setTab("day");
-    setPhotoRequest((value) => value + 1);
+    setScanRequest((value) => value + 1);
   }
+
+  // Дневник гасит флаг сразу после обработки — иначе добавление открывалось бы
+  // само при каждом возврате на вкладку «Дневник».
+  const handleScanRequestHandled = useCallback(() => setScanRequest(0), []);
 
   return (
     <div className="mx-auto min-h-dvh max-w-lg px-4 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -87,7 +101,8 @@ export default function App() {
           targets={targets}
           date={date}
           setDate={setDate}
-          photoRequest={photoRequest}
+          scanRequest={scanRequest}
+          onScanRequestHandled={handleScanRequestHandled}
         />
       )}
       {tab === "progress" && (
@@ -98,19 +113,20 @@ export default function App() {
       )}
 
       {tab === "day" && (
-      <button
-        type="button"
-        aria-label="Добавить продукт по фото"
-        title="Добавить продукт по фото"
-        onClick={openPhotoCapture}
-        className="fixed z-[45] grid size-14 place-items-center rounded-full border border-white/25 bg-acc text-2xl text-white shadow-xl shadow-acc/30 transition hover:scale-105 hover:brightness-105 active:scale-95"
-        style={{
-          right: "max(1rem, calc((100vw - 32rem) / 2 + 1rem))",
-          bottom: "calc(5.75rem + env(safe-area-inset-bottom))",
-        }}
-      >
-        📷
-      </button>
+        <button
+          type="button"
+          aria-label="Сканировать штрихкод"
+          title="Сканировать штрихкод"
+          onClick={openBarcodeScanner}
+          className="fixed z-[45] flex items-center gap-2 rounded-full border border-white/25 bg-acc py-3 pr-4 pl-3.5 text-white shadow-xl shadow-acc/30 transition hover:scale-105 hover:brightness-105 active:scale-95"
+          style={{
+            right: "max(1rem, calc((100vw - 32rem) / 2 + 1rem))",
+            bottom: "calc(5.75rem + env(safe-area-inset-bottom))",
+          }}
+        >
+          <IconScan active />
+          <span className="text-[13px] leading-none font-semibold whitespace-nowrap">Сканировать</span>
+        </button>
       )}
 
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[rgb(24_16_44/.92)] backdrop-blur-xl">

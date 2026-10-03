@@ -28,7 +28,6 @@ export default function Onboarding({ onDone }: { onDone: (p: Profile) => void })
       startDate: today(),
       calorieAdjust: 0,
       calorieAdjustLocked: false,
-      customMacros: null,
     }),
     [sex, age, height, weight, target, activity, goal, pace],
   );

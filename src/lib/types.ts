@@ -19,8 +19,6 @@ export interface Profile {
   calorieAdjust: number;
   /** замок: значение корректировки защищено от случайного сдвига слайдером */
   calorieAdjustLocked?: boolean;
-  /** ручные макросы (если заданы) */
-  customMacros?: Macros | null;
 }
 
 export interface Macros {

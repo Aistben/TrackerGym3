@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { AppState } from "./types";
+import type { AppState, Profile } from "./types";
 import { SEED_PRODUCTS } from "./seed";
 
 const KEY = "nutri-tracker-v1";
@@ -12,6 +12,17 @@ export const emptyState: AppState = {
   recentProductIds: [],
 };
 
+/**
+ * В ранних версиях можно было задать БЖУ вручную. Этот режим убрали, поэтому
+ * сохранённые значения вычищаем — иначе старые макросы молча перебивали бы
+ * расчёт и их нельзя было бы изменить в интерфейсе.
+ */
+function dropLegacyMacros(profile: Profile): Profile {
+  const clean = { ...profile } as Profile & { customMacros?: unknown };
+  delete clean.customMacros;
+  return clean;
+}
+
 export function loadState(): AppState {
   try {
     const raw = localStorage.getItem(KEY);
@@ -19,7 +30,8 @@ export function loadState(): AppState {
     const parsed = JSON.parse(raw) as AppState;
     const ids = new Set(parsed.products?.map((p) => p.id));
     const merged = [...(parsed.products ?? []), ...SEED_PRODUCTS.filter((p) => !ids.has(p.id))];
-    return { ...emptyState, ...parsed, products: merged, recentProductIds: parsed.recentProductIds ?? [] };
+    const profile = parsed.profile ? dropLegacyMacros(parsed.profile) : null;
+    return { ...emptyState, ...parsed, profile, products: merged, recentProductIds: parsed.recentProductIds ?? [] };
   } catch {
     return emptyState;
   }
