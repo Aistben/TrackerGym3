@@ -59,7 +59,7 @@ test("продукты из «Магнита» лежат в конце базы
   assert.equal(zephyr.id, "brand-163");
   assert.equal(zephyr.name, "Зефир «Бело-розовый» с ароматом ванили и малины");
   assert.equal(zephyr.brand, "Сокол");
-  assert.equal(zephyr.barcode, "4680328047688");
+  assert.equal(zephyr.barcode, "4603513006871");
   assert.equal(zephyr.kcal, 320);
   assert.equal(zephyr.protein, 0.8);
   assert.equal(zephyr.fat, 0);
@@ -93,6 +93,15 @@ test("новая версия базы докатывается к сохран�
     1,
     "новинка задвоилась при слиянии с сохранённой базой",
   );
-  assert.ok(merged.products.some((product) => product.barcode === "4680328047688"), "зефир из обновления не доехал до сохранённой базы");
-  assert.equal(merged.products.filter((product) => product.barcode === "4680328047688").length, 1);
+  assert.ok(merged.products.some((product) => product.barcode === "4603513006871"), "зефир из обновления не доехал до сохранённой базы");
+  assert.equal(merged.products.filter((product) => product.barcode === "4603513006871").length, 1);
+
+  // Старый неверный код в сохранённой карточке должен замениться фабричным.
+  const stale = {
+    ...SEED_PRODUCTS.at(-1)!,
+    barcode: "4680328047688",
+  };
+  const patched = normalizeState({ ...emptyState, products: [stale] });
+  const updated = patched.products.find((product) => product.id === "brand-163")!;
+  assert.equal(updated.barcode, "4603513006871");
 });

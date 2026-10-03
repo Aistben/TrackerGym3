@@ -52,10 +52,12 @@ test("штрихкод из базы находится и без интерне
 });
 
 test("зефир Сокол находится по названию и коду маркировки", () => {
-  const zephyr = SEED_PRODUCTS.find((product) => product.barcode === "4680328047688")!;
+  const zephyr = SEED_PRODUCTS.find((product) => product.barcode === "4603513006871")!;
   assert.ok(zephyr);
   assert.equal(searchProducts(SEED_PRODUCTS, "зефир бело-розовый ароматом ванили малины").items[0]?.id, zephyr.id);
-  assert.equal(searchProducts(SEED_PRODUCTS, "4680328047688").items[0]?.id, zephyr.id);
+  assert.equal(searchProducts(SEED_PRODUCTS, "4603513006871").items[0]?.id, zephyr.id);
+  assert.equal(searchProducts(SEED_PRODUCTS, "04603513006871").items[0]?.id, zephyr.id);
+  assert.equal(searchProducts(SEED_PRODUCTS, "4603513006871120").items[0]?.id, zephyr.id);
 });
 
 test("опечатка и перестановка букв находят соус", () => {

@@ -49,12 +49,30 @@ export function normalizeState(value: unknown): AppState {
   const profile = parsed.profile && typeof parsed.profile === "object" ? normalizeProfile(parsed.profile as Profile) : null;
   const products = Array.isArray(parsed.products) ? parsed.products : [];
   const ids = new Set(products.map((product) => product.id));
+  const seedById = new Map(SEED_PRODUCTS.map((product) => [product.id, product]));
+  // Базовые карточки обновляем из сида: иначе старый неверный штрихкод зефира
+  // так и остался бы в localStorage, и сканер его не находил.
+  const merged = products.map((product) => {
+    const seed = seedById.get(product.id);
+    if (!seed || product.source !== "base") return product;
+    return {
+      ...product,
+      name: seed.name,
+      brand: seed.brand,
+      barcode: seed.barcode,
+      kcal: seed.kcal,
+      protein: seed.protein,
+      fat: seed.fat,
+      carbs: seed.carbs,
+      portion: seed.portion,
+    };
+  });
 
   return {
     ...emptyState,
     ...parsed,
     profile,
-    products: [...products, ...SEED_PRODUCTS.filter((product) => !ids.has(product.id))],
+    products: [...merged, ...SEED_PRODUCTS.filter((product) => !ids.has(product.id))],
     meals: Array.isArray(parsed.meals) ? parsed.meals : [],
     weights: Array.isArray(parsed.weights) ? parsed.weights : [],
     recentProductIds: Array.isArray(parsed.recentProductIds) ? parsed.recentProductIds : [],

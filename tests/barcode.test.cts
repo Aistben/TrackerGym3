@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { expandUpce, extractBarcode, normalizeGtin, sameBarcode } from "../src/lib/barcode";
+import { expandUpce, extractBarcode, gtinCandidates, productMatchesBarcode, validGtinChecksum, normalizeGtin, sameBarcode } from "../src/lib/barcode";
 
 test("обычные штрихкоды EAN/UPC/ITF", () => {
   assert.equal(extractBarcode("4600494561238"), "4600494561238");
@@ -34,6 +34,20 @@ test("мусорные QR не превращаются в штрихкод", ()
   assert.equal(extractBarcode("SKU123456788"), null);
   assert.equal(extractBarcode("t=20201003&s=1234.56"), null);
   assert.equal(extractBarcode("Наименование товара 4600494561238 шт"), null);
+});
+
+test("хвост «120» со срока годности не ломает EAN-13", () => {
+  // На стикере зефира Сокол рядом со штрихкодом стоит «срок годности 120 дней».
+  assert.equal(validGtinChecksum("4603513006871"), true);
+  assert.equal(extractBarcode("4603513006871120"), "4603513006871");
+  assert.equal(extractBarcode("4603513006871 120"), "4603513006871");
+  assert.ok(gtinCandidates("4603513006871120").includes("4603513006871"));
+  assert.equal(productMatchesBarcode({ barcode: "4603513006871" }, "4603513006871120"), true);
+  assert.equal(productMatchesBarcode({ barcode: "4603513006871" }, "04603513006871"), true);
+});
+
+test("GS1 с EAN-13 без ведущего нуля в GTIN-14", () => {
+  assert.equal(extractBarcode("01460351300687121ABC"), "4603513006871");
 });
 
 test("normalizeGtin и sameBarcode", () => {
