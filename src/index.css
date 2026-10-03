@@ -13,6 +13,9 @@
 }
 
 html, body, #root { min-height: 100%; }
+/* Фон под документом: если WebView (например, приложение с домашнего экрана на
+   iPhone) оставит под вьюпортом полоску, она будет цвета приложения, а не белой. */
+html { background-color: #150f26; }
 body {
   margin: 0;
   background-color: #150f26;
@@ -59,15 +62,24 @@ input[type="search"]::-webkit-search-decoration,
 input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
 input[type="date"], input[type="time"] { color-scheme: dark; }
 :focus-visible { outline: 2px solid rgb(45 212 191 / .75); outline-offset: 2px; }
-.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+/* Нижняя безопасная зона (индикатор «домой» на iPhone).
+   В установленном на домашний экран приложении iOS на старте отдаёт env()
+   завышенным (иногда в 2–3 раза) — тогда под иконками футера вырастает
+   пустая полоса и футер выглядит «не соединённым» с краем экрана. Настоящая
+   высота индикатора — не больше 34px, поэтому значение ограничиваем. */
+:root { --safe-bottom: 0px; --safe-bottom: min(34px, env(safe-area-inset-bottom, 0px)); }
+.safe-bottom { padding-bottom: var(--safe-bottom); }
 
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 .rise { animation: rise .22s ease-out both; }
 @keyframes sheet-in { from { transform: translateY(100%); } to { transform: none; } }
 .sheet-in { animation: sheet-in .25s cubic-bezier(.22,1,.36,1) both; }
+/* Выпадающий список плавно раскрывается вниз от своего поля */
+@keyframes drop-in { from { opacity: 0; transform: translateY(-8px) scaleY(.94); } to { opacity: 1; transform: none; } }
+.drop-in { transform-origin: top center; animation: drop-in .18s cubic-bezier(.22,1,.36,1) both; }
 @keyframes scan-beam { from { transform: translateY(0); opacity: .65; } to { transform: translateY(72px); opacity: 1; } }
 .scan-beam { animation: scan-beam 1.7s ease-in-out infinite alternate; }
-@media (prefers-reduced-motion: reduce) { .scan-beam { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .scan-beam { animation: none; } .drop-in { animation: none; } }
 
 @media (min-width: 640px) {
   body { background-size: cover, 100% auto; }

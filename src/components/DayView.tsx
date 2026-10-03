@@ -868,7 +868,7 @@ function CenterNotice({ message }: { message: string }) {
       style={{
         left: "max(1rem, calc((100vw - 32rem) / 2 + 1rem))",
         right: "max(5.25rem, calc((100vw - 32rem) / 2 + 5.25rem))",
-        bottom: "calc(5.75rem + env(safe-area-inset-bottom))",
+        bottom: "calc(5.75rem + var(--safe-bottom))",
       }}
     >
       <div className="rise flex min-h-14 w-full items-center rounded-2xl border border-acc2/40 bg-panel px-4 py-2 text-left text-[13px] leading-snug font-semibold text-ink shadow-xl shadow-black/15 backdrop-blur-xl">
