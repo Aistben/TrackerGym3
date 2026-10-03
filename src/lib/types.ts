@@ -81,6 +81,21 @@ export interface WeighIn {
   weight: number;
 }
 
+/**
+ * Продукт, скопированный на другой день, но ещё не разложенный по приёмам.
+ * Живёт в корзине своего дня: пользователь зажимает продукт в корзине и
+ * перетаскивает в нужную карточку приёма.
+ */
+export interface BasketItem {
+  id: string;
+  /** день, на который продукт перенесён (YYYY-MM-DD) — корзина этого дня */
+  date: string;
+  /** когда положили в корзину: порядок в списке */
+  createdAt: number;
+  /** копия продукта; id строки в приёме выдаётся заново при перетаскивании */
+  entry: MealEntry;
+}
+
 export interface AppState {
   profile: Profile | null;
   products: Product[];
@@ -88,4 +103,6 @@ export interface AppState {
   weights: WeighIn[];
   /** id-ы продуктов в порядке последнего использования (самый свежий — первый) */
   recentProductIds: string[];
+  /** корзина: продукты, перенесённые на день, но ещё не разложенные по приёмам */
+  basket: BasketItem[];
 }
