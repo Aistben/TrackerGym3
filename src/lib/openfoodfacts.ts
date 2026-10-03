@@ -31,9 +31,15 @@ export function mapProduct(p: any): Product | null {
   if (!p) return null;
   const n = p.nutriments ?? {};
   const servingGrams = Number.parseFloat(String(p.serving_quantity ?? "")) || undefined;
-  const kcal =
+  const protein = nutriment(n, ["proteins_100g", "proteins"], servingGrams);
+  const fat = nutriment(n, ["fat_100g", "fat"], servingGrams);
+  const carbs = nutriment(n, ["carbohydrates_100g", "carbohydrates"], servingGrams);
+  const declaredKcal =
     nutriment(n, ["energy-kcal_100g", "energy-kcal", "energy-kcal_value"]) ||
     Math.round(nutriment(n, ["energy_100g", "energy", "energy_value"]) / 4.184);
+  // Некоторые карточки содержат БЖУ, но не заполненную энергетическую ценность.
+  // Рассчитываем ккал по стандартной формуле, чтобы такие продукты тоже находились.
+  const kcal = declaredKcal || Math.round(protein * 4 + fat * 9 + carbs * 4);
   const name: string = p.product_name_ru || p.product_name || p.product_name_en || p.generic_name_ru || p.generic_name || p.generic_name_en || "";
   if (!name) return null;
   return {
@@ -42,9 +48,9 @@ export function mapProduct(p: any): Product | null {
     brand: (typeof p.brands === "string" ? p.brands.split(",")[0] : p.brands?.[0] ?? "").trim() || undefined,
     barcode: p.code,
     kcal: Math.round(Math.max(0, kcal) * 10) / 10,
-    protein: nutriment(n, ["proteins_100g", "proteins"], servingGrams),
-    fat: nutriment(n, ["fat_100g", "fat"], servingGrams),
-    carbs: nutriment(n, ["carbohydrates_100g", "carbohydrates"], servingGrams),
+    protein,
+    fat,
+    carbs,
     portion: servingGrams,
     source: "off",
     createdAt: new Date().toISOString(),

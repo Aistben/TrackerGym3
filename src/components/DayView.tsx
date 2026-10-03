@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AppState, Meal, MealEntry, Product, Targets } from "../lib/types";
 import { dayTotals, entryTotals, humanDate, round, shiftDate, sumTotals, today } from "../lib/nutrition";
 import { uid } from "../lib/storage";
+import { sameBarcode } from "../lib/barcode";
 import { Bar, Btn, Empty, Field, IconBtn, Ring, Sheet, noSuggest, numField } from "./ui";
 import AddFood from "./AddFood";
 
@@ -396,7 +397,15 @@ export default function DayView({
             mealTitle={mealTitle(addTo.title)}
             startMode={addMode}
             onSaveProduct={(p: Product) =>
-              setState((s) => ({ ...s, products: [p, ...s.products.filter((x) => x.id !== p.id)] }))
+              setState((s) => ({
+                ...s,
+                // Штрихкод уникален: если онлайн-поиск исправил карточку,
+                // не оставляем в базе две версии одного продукта.
+                products: [
+                  p,
+                  ...s.products.filter((x) => x.id !== p.id && !(p.barcode && sameBarcode(x.barcode, p.barcode))),
+                ],
+              }))
             }
             onDeleteProduct={(id) =>
               setState((s) => ({
