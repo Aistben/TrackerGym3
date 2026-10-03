@@ -154,19 +154,25 @@ export default function AddFood({
     }
     setLoading(true);
     setNotice("Ищем штрихкод " + code + "…");
+    let status: "ok" | "not-found" | "offline" = "not-found";
     try {
-      const found = await lookupBarcode(code);
-      if (found) {
+      const lookup = await lookupBarcode(code);
+      status = lookup.status;
+      if (lookup.product) {
         setNotice(null);
-        pick(found, true);
+        pick(lookup.product, true);
         return;
       }
     } catch {
-      /* fallthrough */
+      status = "offline";
     } finally {
       setLoading(false);
     }
-    setNotice(`Штрихкод ${code} не найден — добавь карточку вручную`);
+    setNotice(
+      status === "offline"
+        ? `Нет связи с Open Food Facts — код ${code} не проверен. Заполни карточку вручную или повтори позже.`
+        : `Штрихкод ${code} не найден в Open Food Facts — добавь карточку вручную`,
+    );
     setEditing(null);
     setDraft({ ...blankDraft, barcode: code });
     setMode("form");
@@ -178,11 +184,16 @@ export default function AddFood({
     setLoading(true);
     setNotice("Ищем продукт по штрихкоду…");
     try {
-      const found = await lookupBarcode(code);
-      if (!found) {
-        setNotice("Продукт не найден. Заполни название и БЖУ вручную.");
+      const lookup = await lookupBarcode(code);
+      if (!lookup.product) {
+        setNotice(
+          lookup.status === "offline"
+            ? "Нет связи с Open Food Facts. Проверь интернет и попробуй ещё раз — или заполни карточку вручную."
+            : "Продукт не найден в Open Food Facts. Заполни название и БЖУ вручную.",
+        );
         return;
       }
+      const found = lookup.product;
       setDraft((current) => ({
         ...current,
         name: found.name,
