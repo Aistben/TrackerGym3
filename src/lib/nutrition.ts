@@ -39,11 +39,6 @@ export function computeTargets(profile: Profile, currentWeight: number): Targets
   let calories = Math.round(tdee + dailyDelta + (profile.calorieAdjust || 0));
   calories = Math.max(calories, Math.round(bmr * 0.85));
 
-  if (profile.customMacros) {
-    const m = profile.customMacros;
-    return { bmr, tdee, calories, ...m };
-  }
-
   // Белок: 1.8–2.2 г/кг. Жиры — 30% калорий, остаток приходится на углеводы.
   // Более высокая доля жиров не завышает углеводы при наборе массы.
   const proteinPerKg = profile.goal === "lose" ? 2.2 : 1.8;
@@ -125,6 +120,12 @@ export function humanDate(iso: string) {
 export function shortDate(iso: string) {
   const d = new Date(iso + "T12:00:00");
   return `${d.getDate()} ${MON[d.getMonth()]}`;
+}
+
+/** Подпись с днём недели: «пт 3» — для недельного графика, где важен день недели. */
+export function weekdayDate(iso: string) {
+  const d = new Date(iso + "T12:00:00");
+  return `${WD[d.getDay()]} ${d.getDate()}`;
 }
 
 /** Точка отсчёта плановой траектории веса */

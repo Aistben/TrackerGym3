@@ -1,70 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BrowserMultiFormatReader } from "@zxing/browser";
-import { BarcodeFormat, DecodeHintType } from "@zxing/library";
-import { extractBarcode } from "../lib/barcode";
+import { createNativeDetector, decodePixels, pickProductCode } from "../lib/scannerDetector";
 import { Btn, noSuggest } from "./ui";
 
-const FORMATS = [
-  BarcodeFormat.EAN_13,
-  BarcodeFormat.EAN_8,
-  BarcodeFormat.UPC_A,
-  BarcodeFormat.UPC_E,
-  BarcodeFormat.CODE_128,
-  BarcodeFormat.CODE_39,
-  BarcodeFormat.ITF,
-  BarcodeFormat.QR_CODE,
-  BarcodeFormat.DATA_MATRIX,
-];
-
-const NATIVE_FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "itf", "qr_code", "data_matrix"];
-
-/**
- * Для живого видео TRY_HARDER нельзя включать — на каждый кадр (особенно
- * QR/DataMatrix) он добавляет несколько проходов распознавания и на обычном
- * телефоне декодер захлёбывается: сканер «висит» и в итоге ничего не находит.
- * TRY_HARDER оставляем только для разового разбора уже снятого фото, где
- * скорость не критична, а точность важнее.
- */
-function makeLiveReader() {
-  const hints = new Map();
-  hints.set(DecodeHintType.POSSIBLE_FORMATS, FORMATS);
-  return new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 100 });
-}
-
-function makePhotoReader() {
-  const hints = new Map();
-  hints.set(DecodeHintType.POSSIBLE_FORMATS, FORMATS);
-  hints.set(DecodeHintType.TRY_HARDER, true);
-  return new BrowserMultiFormatReader(hints);
-}
-
-/**
- * Раньше, если браузер не поддерживал хотя бы один формат из списка (чаще
- * всего это были qr_code или data_matrix на части Android-сборок),
- * `new BarcodeDetector({ formats: [...] })` кидал исключение — и ловился
- * общим catch, который гасил всю камеру с невнятной ошибкой «видео
- * недоступно», хотя сама камера работала нормально. Теперь сначала спрашиваем
- * реально поддерживаемые форматы и используем только их; если после этого
- * список пуст или API недоступно — просто уходим на ZXing, а не ломаем сканер.
- */
-async function createNativeDetector(): Promise<{
-  detect: (source: HTMLVideoElement | HTMLImageElement) => Promise<any[]>;
-} | null> {
-  const Native = (window as any).BarcodeDetector;
-  if (!Native) return null;
-  try {
-    let formats = NATIVE_FORMATS;
-    if (typeof Native.getSupportedFormats === "function") {
-      const supported: string[] = await Native.getSupportedFormats();
-      const filtered = NATIVE_FORMATS.filter((f) => supported.includes(f));
-      if (!filtered.length) return null;
-      formats = filtered;
-    }
-    return new Native({ formats });
-  } catch {
-    return null;
-  }
-}
+/** Кадр для JS-декодера уменьшаем: так ZXing успевает разбирать каждый кадр. */
+const LIVE_WIDTH = 800;
+/** Фото с телефона большое — перед разбором ужимаем до разумного размера. */
+const PHOTO_MAX = 1600;
+/** Раз в ~1.2 с разбираем кадр ещё и по областям: код может быть не по центру. */
+const DEEP_SCAN_EVERY = 1200;
 
 export default function Scanner({ onDetect, onClose }: { onDetect: (code: string) => void; onClose: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -83,13 +26,9 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
   const [starting, setStarting] = useState(true);
   const [slow, setSlow] = useState(false);
 
-  const accept = useCallback(
-    (raw: string) => {
-      const code = extractBarcode(raw);
-      if (!code) {
-        setWarn(`В коде «${raw.slice(0, 36)}${raw.length > 36 ? "…" : ""}» нет номера товара. Наведи на полосатый штрихкод.`);
-        return false;
-      }
+  /** Код найден: вибрируем, глушим камеру и отдаём номер продукта наверх. */
+  const finish = useCallback(
+    (code: string) => {
       if (done.current) return true;
       done.current = true;
       try {
@@ -104,13 +43,28 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
     [onDetect],
   );
 
-  /* ---------- живое видео: нативный BarcodeDetector, иначе ZXing ---------- */
+  /** Ниже — уже разобранный код (GTIN), повторно фильтровать его не нужно. */
+  const accept = useCallback(
+    (code: string, rawForWarning = code) => {
+      if (!code) {
+        setWarn(`В коде «${rawForWarning.slice(0, 36)}${rawForWarning.length > 36 ? "…" : ""}» нет номера товара. Наведи на штрихкод или QR с кодом продукта.`);
+        return false;
+      }
+      setWarn(null);
+      return finish(code);
+    },
+    [finish],
+  );
+
+  /* ---------- живое видео: нативный BarcodeDetector + ZXing на каждом кадре ---------- */
   useEffect(() => {
     done.current = false;
     let cancelled = false;
-    let raf = 0;
-    let zxControls: { stop: () => void } | undefined;
+    let frameTimer = 0;
+    let stream: MediaStream | null = null;
     setSlow(false);
+    setTorchOn(false);
+    setHasTorch(false);
     // Если за 8 секунд активного сканирования код так и не найден — скорее
     // всего дело в плохом свете/фокусе/отражении, и дальше ждать смысла
     // немного: подсказываем более надёжный путь — снять фото и разобрать его.
@@ -122,10 +76,11 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
       setStarting(true);
       setError(null);
       try {
-        // Полный HD тут не нужен и только замедляет разбор каждого кадра
-        // (особенно у JS-декодера ZXing) — 720p читает штрихкод/QR не хуже
-        // с обычной дистанции, а кадры обрабатываются заметно быстрее.
-        const stream = await navigator.mediaDevices.getUserMedia({
+        if (!window.isSecureContext) throw new Error("insecure-context");
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error("camera-unavailable");
+        // Полный HD тут не нужен: 720p хватает с обычной дистанции, а кадры
+        // обрабатываются заметно быстрее.
+        stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: false,
         });
@@ -140,51 +95,78 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
 
         const video = videoRef.current!;
         video.srcObject = stream;
-        await video.play().catch(() => undefined);
+        await video.play();
+        if (cancelled) return;
         setStarting(false);
 
         const detector = await createNativeDetector();
-        if (detector) {
-          const tick = async () => {
-            if (cancelled || done.current) return;
-            try {
-              const codes = await detector.detect(video);
-              if (codes?.length) accept(codes[0].rawValue);
-            } catch {
-              /* кадр не разобрали — пробуем следующий */
+        if (cancelled) return;
+
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d", { willReadFrequently: true });
+        let lastDeepScan = 0;
+        const tick = async () => {
+          if (cancelled || done.current) return;
+          if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth) {
+            let frameCodes: Array<{ rawValue: string; format?: string | number }> = [];
+            if (detector) {
+              try {
+                frameCodes = await detector.detect(video);
+              } catch {
+                // Сломанный нативный детектор не должен выключать сканер —
+                // кадр ниже разберёт ZXing.
+                frameCodes = [];
+              }
             }
-            raf = requestAnimationFrame(() => setTimeout(tick, 100) as unknown as number);
-          };
-          tick();
-        } else {
-          // Либо BarcodeDetector недоступен, либо не поддержал нужные форматы
-          // (это раньше валило весь сканер ошибкой) — используем ZXing.
-          const reader = makeLiveReader();
-          zxControls = await reader.decodeFromStream(stream, video, (result) => {
-            if (result) accept(result.getText());
-          });
-        }
+            if (cancelled || done.current) return;
+            const nativeCode = pickProductCode(frameCodes);
+            if (nativeCode) return void accept(nativeCode);
+
+            if (context) {
+              const scale = Math.min(1, LIVE_WIDTH / video.videoWidth);
+              canvas.width = Math.round(video.videoWidth * scale);
+              canvas.height = Math.round(video.videoHeight * scale);
+              context.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const frame = context.getImageData(0, 0, canvas.width, canvas.height);
+              const now = performance.now();
+              const deep = now - lastDeepScan >= DEEP_SCAN_EVERY;
+              if (deep) lastDeepScan = now;
+              const results = decodePixels(frame.data, canvas.width, canvas.height, deep ? { multiple: true } : {});
+              if (cancelled || done.current) return;
+              const zxingCode = pickProductCode(results.map((r) => ({ rawValue: r.getText(), format: r.getBarcodeFormat() })));
+              if (zxingCode) return void accept(zxingCode);
+            }
+
+            // В кадре что-то было (например, рекламный QR без номера товара) —
+            // подсказываем, что именно не так, но продолжаем сканировать.
+            if (frameCodes.length) accept("", frameCodes[0].rawValue);
+          }
+          if (!cancelled && !done.current) frameTimer = window.setTimeout(tick, 150);
+        };
+        void tick();
       } catch (e: any) {
         if (cancelled) return;
         setStarting(false);
         setError(
-          e?.name === "NotAllowedError"
-            ? "Браузер не дал доступ к камере. Разреши камеру для сайта — или сними штрихкод камерой телефона кнопкой ниже."
-            : "Живое видео недоступно (часто так во встроенном окне). Сними штрихкод камерой телефона кнопкой ниже.",
+          e?.message === "insecure-context"
+            ? "Камера работает только по HTTPS. Открой защищённую ссылку приложения или выбери фото ниже."
+            : e?.name === "NotAllowedError"
+              ? "Браузер не дал доступ к камере. Разреши камеру для сайта — или сними штрихкод камерой телефона кнопкой ниже."
+              : "Живое видео недоступно (часто так во встроенном окне). Сними штрихкод камерой телефона кнопкой ниже.",
         );
       }
     }
 
     start();
-    stopRef.current = () => {
+    const stop = () => {
       cancelled = true;
       window.clearTimeout(slowTimer);
-      cancelAnimationFrame(raf);
-      zxControls?.stop();
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
+      window.clearTimeout(frameTimer);
+      stream?.getTracks().forEach((t) => t.stop());
+      if (streamRef.current === stream) streamRef.current = null;
     };
-    return () => stopRef.current?.();
+    stopRef.current = stop;
+    return stop;
   }, [facing, accept]);
 
   async function toggleTorch() {
@@ -204,16 +186,39 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
     setWarn(null);
     const url = URL.createObjectURL(file);
     try {
+      const img = await loadImage(url);
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (context) {
+        const scale = Math.min(1, PHOTO_MAX / Math.max(img.naturalWidth, img.naturalHeight));
+        canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+        context.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+        // По фото скорость не важна, а точность важнее: TRY_HARDER и разбор
+        // по областям — штрихкод может быть в углу снимка.
+        const results = decodePixels(pixels.data, canvas.width, canvas.height, { tryHarder: true, multiple: true });
+        const code = pickProductCode(results.map((r) => ({ rawValue: r.getText(), format: r.getBarcodeFormat() })));
+        if (code) {
+          accept(code);
+          return;
+        }
+      }
+
+      // Второй шанс — нативный детектор: он декодирует иначе и иногда видит
+      // то, что пропустил ZXing.
       const detector = await createNativeDetector();
       if (detector) {
-        const img = await loadImage(url);
         const codes = await detector.detect(img).catch(() => []);
-        if (codes?.length && accept(codes[0].rawValue)) return;
+        const code = pickProductCode(codes ?? []);
+        if (code) {
+          accept(code);
+          return;
+        }
       }
-      const result = await makePhotoReader().decodeFromImageUrl(url);
-      accept(result.getText());
-    } catch {
       setWarn("На фото не нашёлся штрихкод. Сними ближе, ровно и без бликов — или введи цифры под кодом вручную.");
+    } catch {
+      setWarn("Не получилось прочитать фото. Попробуй другой снимок или введи цифры под кодом вручную.");
     } finally {
       URL.revokeObjectURL(url);
       setBusy(false);
@@ -257,7 +262,7 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
       </div>
 
       <p className="text-center text-[11px] leading-snug text-mute">
-        Наведи на полосатый штрихкод (EAN-13 / EAN-8 / UPC). QR читается, если в нём номер товара.
+        Наведи на штрихкод, QR или DataMatrix с номером товара (GTIN). QR со ссылкой на сайт или чеком не содержит БЖУ. Поиск — в своей базе и Open Food Facts.
       </p>
 
       {slow && !warn && !error && (
@@ -283,12 +288,12 @@ export default function Scanner({ onDetect, onClose }: { onDetect: (code: string
         <input
           className="field compact"
           {...noSuggest}
-          inputMode="numeric"
-          placeholder="Или цифры под кодом: 4600494561238"
+          aria-label="Штрихкод или содержимое QR"
+          placeholder="Введи штрихкод или вставь текст QR"
           value={manual}
-          onChange={(e) => setManual(e.target.value.replace(/\D/g, ""))}
+          onChange={(e) => setManual(e.target.value)}
         />
-        <Btn size="sm" className="shrink-0 px-4" disabled={manual.length < 6} onClick={() => accept(manual)}>
+        <Btn size="sm" className="shrink-0 px-4" disabled={!manual.trim() || busy} onClick={() => accept(pickProductCode([{ rawValue: manual }]) ?? "", manual)}>
           Найти
         </Btn>
       </div>

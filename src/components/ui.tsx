@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 export function Sheet({
   open,
@@ -174,6 +174,141 @@ export function IconBtn({
 }
 
 /** Сегментированный переключатель (вкладки внутри блока, не на всю навигацию). */
+/**
+ * Выпадающий список вместо системного <select>: подписи переносятся и видны
+ * целиком (в системном они обрезались), меню непрозрачное и не «просвечивает»
+ * сквозь него список под ним. Меню позиционируется по кнопке и открывается
+ * вверх, если снизу не хватает места.
+ */
+export function Select<T extends string | number>({
+  value,
+  onChange,
+  options,
+  placeholder = "Выбери…",
+  className = "",
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: { key: T; label: string; hint?: string; emoji?: string }[];
+  placeholder?: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [rect, setRect] = useState<{ top: number; bottom: number; left: number; width: number; above: boolean; maxHeight: number } | null>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const current = options.find((o) => o.key === value);
+
+  function place() {
+    const r = buttonRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const below = window.innerHeight - r.bottom - 12;
+    const above = r.top - 12;
+    const openUp = below < 220 && above > below;
+    setRect({
+      top: r.bottom + 6,
+      bottom: window.innerHeight - r.top + 6,
+      left: r.left,
+      width: r.width,
+      above: openUp,
+      maxHeight: Math.max(140, Math.min(320, openUp ? above : below)),
+    });
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node;
+      if (!wrapRef.current?.contains(target) && !listRef.current?.contains(target)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const onReflow = () => place();
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown, { passive: true });
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onReflow);
+    window.addEventListener("scroll", onReflow, true);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onReflow);
+      window.removeEventListener("scroll", onReflow, true);
+    };
+  }, [open]);
+
+  return (
+    <div ref={wrapRef} className={`relative ${className}`}>
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => {
+          if (open) {
+            setOpen(false);
+            return;
+          }
+          place();
+          setOpen(true);
+        }}
+        className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left transition active:scale-[0.99] ${
+          open ? "border-acc2 bg-panel2" : "border-line bg-panel2 hover:border-acc2/50"
+        }`}
+      >
+        {current?.emoji && <span className="shrink-0 text-base leading-none">{current.emoji}</span>}
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm leading-snug font-medium break-words">{current?.label ?? placeholder}</span>
+          {current?.hint && <span className="mt-0.5 block text-[11px] leading-snug text-mute">{current.hint}</span>}
+        </span>
+        <span className={`shrink-0 text-xs text-mute transition ${open ? "rotate-180" : ""}`}>▼</span>
+      </button>
+
+      {open && rect && (
+        <div
+          ref={listRef}
+          role="listbox"
+          style={{
+            position: "fixed",
+            left: rect.left,
+            width: rect.width,
+            maxHeight: rect.maxHeight,
+            top: rect.above ? undefined : rect.top,
+            bottom: rect.above ? rect.bottom : undefined,
+          }}
+          className="z-[70] overflow-y-auto overscroll-contain rounded-xl border border-line bg-[#241a40] p-1 shadow-2xl shadow-black/60"
+        >
+          {options.map((option) => {
+            const selected = option.key === value;
+            return (
+              <button
+                key={option.key}
+                role="option"
+                aria-selected={selected}
+                onClick={() => {
+                  onChange(option.key);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left transition ${
+                  selected ? "bg-acc/20" : "hover:bg-white/5"
+                }`}
+              >
+                {option.emoji && <span className="shrink-0 text-base leading-none">{option.emoji}</span>}
+                <span className="min-w-0 flex-1">
+                  <span className={`block text-sm leading-snug font-medium ${selected ? "text-acc" : ""}`}>{option.label}</span>
+                  {option.hint && <span className="mt-0.5 block text-[11px] leading-snug text-mute">{option.hint}</span>}
+                </span>
+                {selected && <span className="shrink-0 text-xs text-acc">✓</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Tabs<T extends string | number>({
   value,
   onChange,

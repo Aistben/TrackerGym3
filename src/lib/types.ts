@@ -17,8 +17,8 @@ export interface Profile {
   startDate: string; // YYYY-MM-DD
   /** ручная корректировка калорий */
   calorieAdjust: number;
-  /** ручные макросы (если заданы) */
-  customMacros?: Macros | null;
+  /** замок: значение корректировки защищено от случайного сдвига слайдером */
+  calorieAdjustLocked?: boolean;
 }
 
 export interface Macros {

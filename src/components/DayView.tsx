@@ -13,17 +13,20 @@ export default function DayView({
   targets,
   date,
   setDate,
-  photoRequest,
+  scanRequest,
+  onScanRequestHandled,
 }: {
   state: AppState;
   setState: React.Dispatch<React.SetStateAction<AppState>>;
   targets: Targets;
   date: string;
   setDate: (d: string) => void;
-  photoRequest: number;
+  /** счётчик: кнопка «Сканировать» на главном экране поднимает его на 1 */
+  scanRequest: number;
+  onScanRequestHandled: () => void;
 }) {
   const [addTo, setAddTo] = useState<Meal | null>(null);
-  const [addMode, setAddMode] = useState<"search" | "scan" | "photo">("search");
+  const [addMode, setAddMode] = useState<"search" | "scan">("search");
   const [scanPick, setScanPick] = useState(false);
   const [newMeal, setNewMeal] = useState(false);
   const [timePick, setTimePick] = useState<Meal | null>(null);
@@ -36,8 +39,7 @@ export default function DayView({
   const [swipedId, setSwipedId] = useState<string | null>(null);
   const [tempMealId, setTempMealId] = useState<string | null>(null);
   const [draftPreview, setDraftPreview] = useState<{ product: Product; grams: number } | null>(null);
-  const [addStep, setAddStep] = useState<"search" | "scan" | "form" | "portion" | "photo">("search");
-  const lastPhotoRequest = useRef(0);
+  const [addStep, setAddStep] = useState<"search" | "scan" | "form" | "portion">("search");
   const noticeTimer = useRef<number | null>(null);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
 
@@ -82,7 +84,7 @@ export default function DayView({
     [],
   );
   const handleAddModeChange = useCallback(
-    (step: "search" | "scan" | "form" | "portion" | "photo") => setAddStep(step),
+    (step: "search" | "scan" | "form" | "portion") => setAddStep(step),
     [],
   );
 
@@ -100,11 +102,14 @@ export default function DayView({
     };
   }, []);
 
+  // Кнопка «Сканировать» на главном экране. Флаг поднимается и тут же гасится
+  // в App, поэтому переключение вкладок (и повторный mount дневника) больше не
+  // открывает добавление само по себе.
   useEffect(() => {
-    if (!photoRequest || photoRequest === lastPhotoRequest.current) return;
-    lastPhotoRequest.current = photoRequest;
-    openPhotoAdd();
-  }, [photoRequest]);
+    if (!scanRequest) return;
+    onScanRequestHandled();
+    openScanAdd();
+  }, [scanRequest, onScanRequestHandled]);
 
   function addMeal(title: string, time: string): Meal {
     const meal = { id: uid(), date, title: title.trim(), time, entries: [] };
@@ -112,8 +117,8 @@ export default function DayView({
     return meal;
   }
 
-  function openPhotoAdd() {
-    // Если день пустой, временный приём удалится после отмены добавления.
+  /** Сканер открываем сразу: день пустой — создаём временный приём. */
+  function openScanAdd() {
     const target = meals[meals.length - 1];
     if (target) {
       setTempMealId(null);
@@ -123,7 +128,8 @@ export default function DayView({
       setTempMealId(meal.id);
       setAddTo(meal);
     }
-    setAddMode("photo");
+    setAddMode("scan");
+    setScanPick(false);
   }
 
   function openScanFor(meal: Meal) {
@@ -434,9 +440,7 @@ export default function DayView({
               ? "Сканер штрихкода"
               : addStep === "form"
                 ? "Карточка продукта"
-                : addStep === "photo"
-                  ? "Продукт по фото"
-                  : "Добавить продукт"
+                : "Добавить продукт"
         }
         placement="bottom"
         compact={false}
@@ -583,7 +587,7 @@ function EntryEditor({
     setGrams(text);
     onPreview(numeric);
   };
-  const quickValues = [30, 50, 100, 150, 200, 250, 300];
+  const quickValues = [50, 100, 150, 200, 250, 300];
 
   return (
     <div className="space-y-2.5">
@@ -593,31 +597,34 @@ function EntryEditor({
       </div>
       <Field label="Количество, г / мл">
         <div className="flex items-center gap-1.5">
-          <IconBtn onClick={() => changeGrams(Math.max(0, value - 10))} title="Уменьшить на 10 г" size={40}>
-            <span className="block -translate-y-px text-lg leading-none font-bold">−</span>
+          <IconBtn onClick={() => changeGrams(Math.max(0, value - 10))} title="Уменьшить на 10 г" size={36}>
+            <span className="block -translate-y-px text-base leading-none font-bold">−</span>
           </IconBtn>
-          <input
-            className="field min-w-0 py-2 text-center text-lg font-bold"
-            {...numField}
-            value={grams}
-            onChange={(event) => changeGrams(event.target.value)}
-          />
-          <IconBtn onClick={() => changeGrams(value + 10)} title="Увеличить на 10 г" size={40}>
-            <span className="block -translate-y-px text-lg leading-none font-bold">+</span>
+          <div className="relative min-w-0 flex-1">
+            <input
+              className="field compact min-w-0 pr-9 text-center text-base font-bold"
+              {...numField}
+              value={grams}
+              onChange={(event) => changeGrams(event.target.value)}
+            />
+            <span className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-[11px] text-mute">г</span>
+          </div>
+          <IconBtn onClick={() => changeGrams(value + 10)} title="Увеличить на 10 г" size={36}>
+            <span className="block -translate-y-px text-base leading-none font-bold">+</span>
           </IconBtn>
         </div>
       </Field>
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-2 gap-1.5">
         {quickValues.map((quick) => (
           <button
             type="button"
             key={quick}
             onClick={() => changeGrams(quick)}
-            className={`rounded-lg border py-1.5 text-xs font-semibold transition active:scale-95 ${
+            className={`rounded-lg border py-2 text-sm font-semibold whitespace-nowrap transition active:scale-95 ${
               value === quick ? "border-acc bg-acc/20 text-acc" : "border-line bg-panel2 hover:border-acc2/60"
             }`}
           >
-            {quick}
+            {quick} г
           </button>
         ))}
       </div>
