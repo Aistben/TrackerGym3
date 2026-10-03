@@ -731,7 +731,12 @@ function EntryRow({
               <span className="whitespace-nowrap font-semibold text-acc">· У {round(totals.carbs, 1)}</span>
             </div>
           </div>
-          <div className="shrink-0 text-xs font-semibold whitespace-nowrap">{round(totals.kcal)}</div>
+          {/* Справа — калории именно этой порции (граммовка × ккал на 100 г).
+              Подпись «ккал» рядом с числом: без неё цифру легко принять
+              за граммы или за ккал на 100 г. */}
+          <div className="shrink-0 text-xs font-semibold whitespace-nowrap">
+            {round(totals.kcal)} <span className="text-[10px] font-medium text-mute">ккал</span>
+          </div>
         </button>
       </div>
     </div>
