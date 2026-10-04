@@ -81,11 +81,12 @@ test("продукты из «Магнита» лежат в конце базы
   assert.deepEqual(
     stm.map((product) => `${product.id}|${product.brand}|${product.name}`),
     [
-      "brand-164|Магнит (СТМ)|Гречка ядрица",
+      "brand-164|Магнит (СТМ)|Гречка ядрица 1 сорт",
       "brand-165|Магнит (СТМ)|Рис круглозёрный",
       "brand-166|Магнит (СТМ)|Макароны Спагетти",
     ],
   );
+  assert.equal(stm[0].barcode, "4650259570050");
   assert.equal(stm[0].kcal, 350);
   assert.equal(stm[0].protein, 13);
   assert.equal(stm[1].kcal, 350);

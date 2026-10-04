@@ -58,13 +58,16 @@ test("крупы и макароны с полки «Магнит» находя
     ["4607016240893", "Увелка"],
     ["4600935000036", "Националь"],
     ["4601916000342", "Мистраль"],
+    ["4650259570050", "Магнит (СТМ)"],
   ] as const;
   for (const [code, brand] of cases) {
     const hit = searchProducts(SEED_PRODUCTS, code, 5);
     assert.equal(hit.items[0]?.brand, brand, code);
     assert.equal(hit.fuzzy, false, code);
   }
+  assert.equal(searchProducts(SEED_PRODUCTS, "4 650 259 570 050", 5).items[0]?.barcode, "4650259570050");
   assert.ok(names("гречка магнит").some((name) => name.includes("Магнит (СТМ)")));
+  assert.ok(names("гречка 1 сорт").some((name) => name.includes("Магнит (СТМ)")));
   assert.ok(names("рис магнит").some((name) => name.includes("Магнит (СТМ)")));
   assert.ok(names("макароны магнит спагетти").some((name) => name.includes("Магнит (СТМ)")));
 });
