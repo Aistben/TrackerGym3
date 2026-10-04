@@ -12,7 +12,7 @@ function validEan13(code: string): boolean {
 }
 
 test("база непустая и без дублей названий у одного бренда", () => {
-  assert.equal(SEED_PRODUCTS.length, 229);
+  assert.equal(SEED_PRODUCTS.length, 232);
   assert.ok(SEED_PRODUCTS.length >= 130, `продуктов в базе: ${SEED_PRODUCTS.length}`);
   const seen = new Set<string>();
   for (const product of SEED_PRODUCTS) {
@@ -48,22 +48,49 @@ test("продукты из «Магнита» лежат в конце базы
   assert.equal(first.brand, "Простоквашино");
 
   const magnetBrands = new Set(["Махеевъ", "Heinz", "Слобода", "Astoria", "Mr. Ricco", "Pikador"]);
-  const sauces = SEED_PRODUCTS.slice(-16, -1);
+  const sauces = SEED_PRODUCTS.slice(-19, -4);
   assert.equal(sauces.length, 15);
   assert.ok(
     sauces.every((product) => magnetBrands.has(product.brand ?? "")),
     sauces.map((product) => `${product.brand} ${product.name}`).join(" | "),
   );
 
-  const zephyr = SEED_PRODUCTS.at(-1)!;
-  assert.equal(zephyr.id, "brand-163");
+  const zephyr = SEED_PRODUCTS.find((product) => product.id === "brand-163")!;
   assert.equal(zephyr.name, "Зефир «Бело-розовый» с ароматом ванили и малины");
   assert.equal(zephyr.brand, "Сокол");
-  assert.equal(zephyr.barcode, "4680328047688");
+  assert.equal(zephyr.barcode, "4603513006871");
   assert.equal(zephyr.kcal, 320);
   assert.equal(zephyr.protein, 0.8);
   assert.equal(zephyr.fat, 0);
   assert.equal(zephyr.carbs, 80.4);
+
+  const groats = [
+    ["4601780000189", "Макфа", "Макароны Спагетти из твёрдых сортов"],
+    ["4607001850090", "Шебекинские", "Макароны Перья"],
+    ["4607016240893", "Увелка", "Гречка ядрица"],
+    ["4600935000036", "Националь", "Рис круглозёрный"],
+    ["4601916000342", "Мистраль", "Рис басмати"],
+  ] as const;
+  for (const [code, brand, name] of groats) {
+    const product = SEED_PRODUCTS.find((item) => item.barcode === code)!;
+    assert.equal(product.brand, brand, code);
+    assert.equal(product.name, name, code);
+  }
+
+  const stm = SEED_PRODUCTS.slice(-3);
+  assert.deepEqual(
+    stm.map((product) => `${product.id}|${product.brand}|${product.name}`),
+    [
+      "brand-164|Магнит (СТМ)|Гречка ядрица 1 сорт",
+      "brand-165|Магнит (СТМ)|Рис круглозёрный",
+      "brand-166|Магнит (СТМ)|Макароны Спагетти",
+    ],
+  );
+  assert.equal(stm[0].barcode, "4650259570050");
+  assert.equal(stm[0].kcal, 350);
+  assert.equal(stm[0].protein, 13);
+  assert.equal(stm[1].kcal, 350);
+  assert.equal(stm[2].kcal, 340);
 });
 
 test("новая версия базы докатывается к сохранённым данным без потерь", () => {
@@ -93,6 +120,15 @@ test("новая версия базы докатывается к сохран�
     1,
     "новинка задвоилась при слиянии с сохранённой базой",
   );
-  assert.ok(merged.products.some((product) => product.barcode === "4680328047688"), "зефир из обновления не доехал до сохранённой базы");
-  assert.equal(merged.products.filter((product) => product.barcode === "4680328047688").length, 1);
+  assert.ok(merged.products.some((product) => product.barcode === "4603513006871"), "зефир из обновления не доехал до сохранённой базы");
+  assert.equal(merged.products.filter((product) => product.barcode === "4603513006871").length, 1);
+
+  // Старый неверный код в сохранённой карточке должен замениться фабричным.
+  const stale = {
+    ...SEED_PRODUCTS.find((product) => product.id === "brand-163")!,
+    barcode: "4680328047688",
+  };
+  const patched = normalizeState({ ...emptyState, products: [stale] });
+  const updated = patched.products.find((product) => product.id === "brand-163")!;
+  assert.equal(updated.barcode, "4603513006871");
 });

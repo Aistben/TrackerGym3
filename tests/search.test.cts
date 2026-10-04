@@ -51,11 +51,34 @@ test("штрихкод из базы находится и без интерне
   assert.equal(searchProducts(SEED_PRODUCTS, "460 4248 018276", 5).items[0]?.id, magnet.id);
 });
 
+test("крупы и макароны с полки «Магнит» находятся по штрихкоду", () => {
+  const cases = [
+    ["4601780000189", "Макфа"],
+    ["4607001850090", "Шебекинские"],
+    ["4607016240893", "Увелка"],
+    ["4600935000036", "Националь"],
+    ["4601916000342", "Мистраль"],
+    ["4650259570050", "Магнит (СТМ)"],
+  ] as const;
+  for (const [code, brand] of cases) {
+    const hit = searchProducts(SEED_PRODUCTS, code, 5);
+    assert.equal(hit.items[0]?.brand, brand, code);
+    assert.equal(hit.fuzzy, false, code);
+  }
+  assert.equal(searchProducts(SEED_PRODUCTS, "4 650 259 570 050", 5).items[0]?.barcode, "4650259570050");
+  assert.ok(names("гречка магнит").some((name) => name.includes("Магнит (СТМ)")));
+  assert.ok(names("гречка 1 сорт").some((name) => name.includes("Магнит (СТМ)")));
+  assert.ok(names("рис магнит").some((name) => name.includes("Магнит (СТМ)")));
+  assert.ok(names("макароны магнит спагетти").some((name) => name.includes("Магнит (СТМ)")));
+});
+
 test("зефир Сокол находится по названию и коду маркировки", () => {
-  const zephyr = SEED_PRODUCTS.find((product) => product.barcode === "4680328047688")!;
+  const zephyr = SEED_PRODUCTS.find((product) => product.barcode === "4603513006871")!;
   assert.ok(zephyr);
   assert.equal(searchProducts(SEED_PRODUCTS, "зефир бело-розовый ароматом ванили малины").items[0]?.id, zephyr.id);
-  assert.equal(searchProducts(SEED_PRODUCTS, "4680328047688").items[0]?.id, zephyr.id);
+  assert.equal(searchProducts(SEED_PRODUCTS, "4603513006871").items[0]?.id, zephyr.id);
+  assert.equal(searchProducts(SEED_PRODUCTS, "04603513006871").items[0]?.id, zephyr.id);
+  assert.equal(searchProducts(SEED_PRODUCTS, "4603513006871120").items[0]?.id, zephyr.id);
 });
 
 test("опечатка и перестановка букв находят соус", () => {

@@ -1,3 +1,4 @@
+import { gtinCandidates, productMatchesBarcode } from "./barcode";
 import type { Product } from "./types";
 
 /**
@@ -82,8 +83,12 @@ function prepare(product: Product): Searchable {
 
 /** Насколько одно слово запроса похоже на продукт: 0 — не подходит. */
 function tokenScore(token: string, item: Searchable, fuzzy: boolean): number {
-  // Длинное число — это штрихкод: сравниваем с кодом целиком, а не со словами.
-  if (/^\d{4,}$/.test(token)) return item.barcode.includes(token) ? 3 : 0;
+  // Длинное число — это штрихкод: EAN, GTIN-14 с нулём и код с хвостом «120».
+  if (/^\d{4,}$/.test(token)) {
+    if (item.barcode.includes(token)) return 3;
+    if (productMatchesBarcode(item.product, token)) return 3;
+    return 0;
+  }
 
   let score = 0;
   for (const word of item.nameTokens) {
@@ -153,6 +158,13 @@ export type SearchOutcome = {
  * совпала хотя бы часть слов (последнее помечаем как «похожие»).
  */
 export function searchProducts(products: Product[], query: string, limit = 60): SearchOutcome {
+  // Сначала как штрихкод целиком: пробелы, GTIN-14 и лишние «120» со срока годности.
+  const digitQuery = query.replace(/\D/g, "");
+  if (/^\d{8,}$/.test(digitQuery)) {
+    const byCode = products.filter((product) => productMatchesBarcode(product, query) || gtinCandidates(query).some((code) => productMatchesBarcode(product, code)));
+    if (byCode.length) return { items: byCode.slice(0, limit), fuzzy: false };
+  }
+
   const tokens = textTokens(query);
   if (!tokens.length) return { items: products.slice(0, limit), fuzzy: false };
 

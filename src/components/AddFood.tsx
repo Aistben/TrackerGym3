@@ -3,7 +3,7 @@ import type { MealEntry, Product } from "../lib/types";
 import { round } from "../lib/nutrition";
 import { uid } from "../lib/storage";
 import { hasNutrition, lookupBarcode, searchOnline } from "../lib/openfoodfacts";
-import { sameBarcode } from "../lib/barcode";
+import { productMatchesBarcode, sameBarcode } from "../lib/barcode";
 import { searchProducts } from "../lib/search";
 import { estimateFromProducts, estimateFromTable, estimateToDraft, suggestFoods, type Estimate } from "../lib/estimate";
 import { Btn, Empty, Field, IconBtn, Sheet, Tabs, noSuggest, numField } from "./ui";
@@ -290,7 +290,7 @@ export default function AddFood({
 
   async function handleCode(code: string) {
     setMode("search");
-    const known = products.find((p) => sameBarcode(p.barcode, code));
+    const known = products.find((p) => productMatchesBarcode(p, code));
     if (known) {
       setNotice(null);
       pick(known);
