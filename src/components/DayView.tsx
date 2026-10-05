@@ -11,6 +11,8 @@ import {
 } from "../lib/basket";
 import type { BasketItem } from "../lib/types";
 import { sameBarcode } from "../lib/barcode";
+import { buildDayRationText, dayTextFileName } from "../lib/dayText";
+import { copyText, downloadTextFile } from "../lib/clipboard";
 import { Bar, Btn, Empty, Field, IconBtn, Ring, Sheet, noSuggest, numField } from "./ui";
 import AddFood from "./AddFood";
 
@@ -118,6 +120,28 @@ export default function DayView({
     if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current);
     setNotice(message);
     noticeTimer.current = window.setTimeout(() => setNotice(null), 1200);
+  }
+
+  /** Рацион дня текстом: норму берём ту, что стоит в настройках профиля. */
+  function dayRationText() {
+    return buildDayRationText({ date, meals: visibleMeals, targets, name: state.profile?.name });
+  }
+
+  async function copyDayRation() {
+    const text = dayRationText();
+    if (await copyText(text)) {
+      notify("Рацион скопирован — можно вставлять");
+      return;
+    }
+    // Буфера нет (приватный режим, встроенный браузер мессенджера) — отдаём файлом,
+    // чтобы рацион всё равно можно было забрать себе и отправить.
+    if (downloadTextFile(dayTextFileName(date), text)) notify("Буфер недоступен — сохранили файл .txt");
+    else notify("Не получилось скопировать рацион");
+  }
+
+  function downloadDayRation() {
+    downloadTextFile(dayTextFileName(date), dayRationText());
+    notify("Рацион сохранён файлом .txt");
   }
 
   useEffect(() => {
@@ -381,6 +405,29 @@ export default function DayView({
           />
         </div>
       )}
+      </div>
+
+      {/* Рацион дня одним текстом: норма в нём — та же, что стоит в настройках
+          профиля, поэтому копию удобно сразу отправить тренеру или в заметки. */}
+      <div className="flex gap-2" data-no-swipe>
+        <Btn
+          variant="soft"
+          size="sm"
+          className="min-w-0 flex-1"
+          onClick={copyDayRation}
+          title="Скопировать рацион за день текстом вместе с нормой БЖУ"
+        >
+          <span className="truncate">📋 Скопировать рацион</span>
+        </Btn>
+        <Btn
+          variant="soft"
+          size="sm"
+          className="shrink-0"
+          onClick={downloadDayRation}
+          title="Скачать рацион за день файлом .txt"
+        >
+          Скачать .txt
+        </Btn>
       </div>
 
       {visibleMeals.map((meal) => {
