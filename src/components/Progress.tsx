@@ -206,7 +206,13 @@ export default function Progress({
         )}
       </div>
 
-      <Sheet open={weighOpen} onClose={() => setWeighOpen(false)} title="Взвешивание" center>
+      <Sheet
+        open={weighOpen}
+        onClose={() => setWeighOpen(false)}
+        title="Взвешивание"
+        center
+        closeButtonClassName="text-acc2 hover:text-acc2"
+      >
         <WeighForm
           weights={state.weights}
           onSave={(date, weight) =>
