@@ -11,12 +11,20 @@ import {
 } from "../lib/basket";
 import type { BasketItem } from "../lib/types";
 import { sameBarcode } from "../lib/barcode";
+import { calculate, formatCalculatorResult, type CalculatorOperator } from "../lib/calculator";
 import { buildDayRationText } from "../lib/dayText";
 import { copyText } from "../lib/clipboard";
 import { Bar, Btn, Empty, Field, IconBtn, Ring, Sheet, noSuggest, numField } from "./ui";
 import AddFood from "./AddFood";
 
 type EntryAction = { mealId: string; mealTitle: string; entry: MealEntry };
+
+const CALCULATOR_OPERATORS: { value: CalculatorOperator; label: string }[] = [
+  { value: "+", label: "+" },
+  { value: "-", label: "−" },
+  { value: "*", label: "×" },
+  { value: "/", label: "÷" },
+];
 
 export default function DayView({
   state,
@@ -47,8 +55,11 @@ export default function DayView({
   const [mealMenu, setMealMenu] = useState<Meal | null>(null);
   /** Продукт, который свайпом попросили удалить — ждём подтверждения */
   const [pendingDelete, setPendingDelete] = useState<EntryAction | null>(null);
-  /** Окно заметок к выбранному дню. */
+  /** Окно заметок к выбранному дню и поля простого калькулятора. */
   const [notesOpen, setNotesOpen] = useState(false);
+  const [calcLeft, setCalcLeft] = useState("");
+  const [calcOperator, setCalcOperator] = useState<CalculatorOperator>("+");
+  const [calcRight, setCalcRight] = useState("");
   /** Корзина дня открыта: продукты, перенесённые на этот день, ждут раскладки */
   const [basketOpen, setBasketOpen] = useState(false);
   /** Продукт, который сейчас тащат пальцем из корзины (и где палец) */
@@ -73,6 +84,9 @@ export default function DayView({
     [state.meals, date],
   );
   const dayNote = state.notes.find((note) => note.date === date)?.text ?? "";
+  const calculatorResult = calculate(calcLeft, calcOperator, calcRight);
+  const calculatorResultText = calculatorResult === null ? null : formatCalculatorResult(calculatorResult);
+  const calculatorSymbol = CALCULATOR_OPERATORS.find((operator) => operator.value === calcOperator)?.label ?? calcOperator;
   const visibleMeals = useMemo(() => {
     if (!preview) return meals;
     return meals.map((meal) =>
@@ -126,6 +140,19 @@ export default function DayView({
       if (text.length) notes.push({ date, text });
       return { ...s, notes };
     });
+  }
+
+  function openNotes() {
+    setCalcLeft("");
+    setCalcOperator("+");
+    setCalcRight("");
+    setNotesOpen(true);
+  }
+
+  function insertCalculatorResult() {
+    if (calculatorResult === null || calculatorResultText === null) return;
+    const line = `${calcLeft.trim()} ${calculatorSymbol} ${calcRight.trim()} = ${calculatorResultText}`;
+    updateDayNote(dayNote ? `${dayNote}${dayNote.endsWith("\n") ? "" : "\n"}${line}` : line);
   }
 
   function notify(message: string) {
@@ -422,7 +449,7 @@ export default function DayView({
           variant="soft"
           size="sm"
           className="shrink-0"
-          onClick={() => setNotesOpen(true)}
+          onClick={openNotes}
           title={dayNote.trim() ? "Открыть заметки за день" : "Добавить заметку за день"}
         >
           📝 Заметки{dayNote.trim() && <span className="size-1.5 rounded-full bg-acc2" />}
@@ -735,6 +762,48 @@ export default function DayView({
               placeholder="Самочувствие, тренировка, планы или любые заметки…"
             />
           </Field>
+          <div className="space-y-2 rounded-xl border border-line bg-panel2/40 p-3">
+            <h4 className="text-xs font-semibold">Калькулятор</h4>
+            <div className="grid grid-cols-[minmax(0,1fr)_3.5rem_minmax(0,1fr)] items-center gap-2">
+              <input
+                className="field compact px-2 text-center"
+                inputMode="decimal"
+                aria-label="Первое число"
+                placeholder="Число"
+                value={calcLeft}
+                onChange={(event) => setCalcLeft(event.target.value)}
+              />
+              <select
+                className="field compact px-1 text-center text-lg font-semibold"
+                aria-label="Операция"
+                value={calcOperator}
+                onChange={(event) => setCalcOperator(event.target.value as CalculatorOperator)}
+              >
+                {CALCULATOR_OPERATORS.map((operator) => (
+                  <option key={operator.value} value={operator.value}>
+                    {operator.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                className="field compact px-2 text-center"
+                inputMode="decimal"
+                aria-label="Второе число"
+                placeholder="Число"
+                value={calcRight}
+                onChange={(event) => setCalcRight(event.target.value)}
+              />
+            </div>
+            <div className="flex min-w-0 items-center justify-between gap-2 rounded-xl bg-panel2/60 px-3 py-2">
+              <span className="min-w-0 truncate text-xs text-mute">
+                {calculatorResultText === null ? "Результат" : `${calcLeft.trim()} ${calculatorSymbol} ${calcRight.trim()} =`}
+              </span>
+              <span className="shrink-0 font-semibold text-acc2">{calculatorResultText ?? "—"}</span>
+            </div>
+            <Btn size="sm" className="w-full" disabled={calculatorResult === null} onClick={insertCalculatorResult}>
+              Вставить результат в заметку
+            </Btn>
+          </div>
           <p className="text-xs text-mute">Заметка сохраняется автоматически отдельно для каждого дня.</p>
           <Btn className="w-full" onClick={() => setNotesOpen(false)}>
             Готово
