@@ -61,18 +61,27 @@ test("старый профиль без истории возврата не л
   assert.equal(state.profile.calorieAdjust, 0);
 });
 
-test("старые профили получают замок по умолчанию, явную разблокировку сохраняем", () => {
+test("общий замок профиля мигрирует старый замок калорий и сохраняет состояние", () => {
   withStorage({ ...emptyState, profile: { ...profile, calorieAdjustLocked: false } });
   const migrated = loadState();
-  assert.equal(migrated.profile?.calorieAdjustLocked, true);
-  assert.equal(migrated.profile?.calorieAdjustLockInitialized, true);
+  assert.equal(migrated.profile?.profileSettingsLocked, true);
+  assert.equal(migrated.profile?.calorieAdjustLocked, undefined);
+  assert.equal(migrated.profile?.calorieAdjustLockInitialized, undefined);
 
   const unlocked = {
     ...migrated,
-    profile: { ...migrated.profile!, calorieAdjustLocked: false },
+    profile: { ...migrated.profile!, profileSettingsLocked: false },
   };
   saveState(unlocked);
-  assert.equal(loadState().profile?.calorieAdjustLocked, false);
+  assert.equal(loadState().profile?.profileSettingsLocked, false);
+});
+
+test("явно снятый старый замок калорий становится снятым общим замком", () => {
+  withStorage({
+    ...emptyState,
+    profile: { ...profile, calorieAdjustLocked: false, calorieAdjustLockInitialized: true },
+  });
+  assert.equal(loadState().profile?.profileSettingsLocked, false);
 });
 
 test("без сохранённых данных отдаём базовое состояние с продуктами", () => {

@@ -27,20 +27,21 @@ function dropLegacyMacros(profile: Profile): Profile {
 }
 
 /**
- * Раньше слайдер корректировки создавался разблокированным. При первом чтении
- * старого профиля фиксируем его, а маркер сохраняет явное решение пользователя
- * разблокировать слайдер при следующих загрузках.
+ * Переносим прежний замок слайдера на общий замок настроек профиля.
+ * Старые профили без явного решения по замку остаются заблокированными.
  */
 function normalizeProfile(profile: Profile): Profile {
   const clean = dropLegacyMacros(profile);
-  if (!clean.calorieAdjustLockInitialized) {
-    return { ...clean, calorieAdjustLocked: true, calorieAdjustLockInitialized: true };
-  }
-  return {
-    ...clean,
-    calorieAdjustLocked: clean.calorieAdjustLocked ?? true,
-    calorieAdjustLockInitialized: true,
-  };
+  const profileSettingsLocked =
+    typeof clean.profileSettingsLocked === "boolean"
+      ? clean.profileSettingsLocked
+      : clean.calorieAdjustLockInitialized
+        ? clean.calorieAdjustLocked ?? true
+        : true;
+
+  delete clean.calorieAdjustLocked;
+  delete clean.calorieAdjustLockInitialized;
+  return { ...clean, profileSettingsLocked };
 }
 
 /** Нормализация используется и при чтении localStorage, и при импорте резервной копии. */
