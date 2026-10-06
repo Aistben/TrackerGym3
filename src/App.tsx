@@ -129,12 +129,7 @@ export default function App() {
         </button>
       )}
 
-      <nav data-bottom-nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[rgb(24_16_44/.92)] backdrop-blur-xl">
-        {/* Установленное на домашний экран приложение на iPhone иногда оставляет
-            под футером полоску «не соединённого» фона: нижний край вьюпорта
-            оказывается выше края экрана. Этот слой продолжает фон футера вниз
-            за пределы вьюпорта, чтобы навигация выглядела единым целым с краем. */}
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-full h-32 bg-[rgb(24_16_44/.92)] backdrop-blur-xl" />
+      <nav data-bottom-nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#18102c]">
         <div className="mx-auto flex max-w-lg px-2 py-1.5">
           {TABS.map((t) => {
             const isActive = tab === t.key;

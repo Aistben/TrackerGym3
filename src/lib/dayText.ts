@@ -26,11 +26,6 @@ export function fullDate(iso: string) {
   return `${WEEKDAYS_SHORT[d.getDay()]}, ${d.getDate()} ${MONTHS_GENITIVE[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-/** Имя файла для сохранения рациона: «рацион-2026-10-05.txt». */
-export function dayTextFileName(iso: string) {
-  return `рацион-${iso}.txt`;
-}
-
 /** Целые цифры в тексте: 318.4 → 318, 0.5 → 1. */
 function num(value: number) {
   return String(round(value));
@@ -66,7 +61,7 @@ export interface DayRationInput {
 /**
  * Рацион за день обычным текстом: приёмы пищи с продуктами и граммовками,
  * итог за день, норма БЖУ из настроек и сколько до неё осталось. Такой текст
- * можно вставить в сообщение или сохранить файлом — например, отправить тренеру.
+ * можно скопировать и вставить в сообщение, например, отправить тренеру.
  */
 export function buildDayRationText({ date, meals, targets, name }: DayRationInput) {
   const day = [...meals].sort((a, b) => a.time.localeCompare(b.time));

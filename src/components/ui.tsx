@@ -12,6 +12,7 @@ export function Sheet({
   compact = false,
   noBackdrop = false,
   solid = false,
+  closeButtonClassName,
   placement = center ? "center" : "bottom",
 }: {
   open: boolean;
@@ -24,6 +25,7 @@ export function Sheet({
   noBackdrop?: boolean;
   /** непрозрачный фон — карточки под шторкой не просвечивают */
   solid?: boolean;
+  closeButtonClassName?: string;
   placement?: "center" | "bottom";
 }) {
   useEffect(() => {
@@ -72,7 +74,7 @@ export function Sheet({
           <h3 className="min-w-0 flex-1 truncate text-base font-semibold leading-snug">{title}</h3>
           <button
             onClick={onClose}
-            className="grid size-8 shrink-0 place-items-center rounded-full bg-panel2 text-mute transition hover:text-ink active:scale-90"
+            className={`grid size-8 shrink-0 place-items-center rounded-full bg-panel2 transition active:scale-90 ${closeButtonClassName ?? "text-mute hover:text-ink"}`}
           >
             ✕
           </button>

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildDayRationText, dayTextFileName, fullDate, mealLabel } from "../src/lib/dayText";
+import { buildDayRationText, fullDate, mealLabel } from "../src/lib/dayText";
 import type { Meal, Targets } from "../src/lib/types";
 
 const targets: Targets = { calories: 2100, protein: 150, fat: 70, carbs: 230, bmr: 1700, tdee: 2400 };
@@ -94,9 +94,8 @@ test("дробные граммовки продуктов читаются по
   assert.match(text, /• Сыр — 12\.5 г · 45 ккал · Б 3 г · Ж 3 г · У 0 г/);
 });
 
-test("дата и имя файла для сохранения", () => {
+test("дата форматируется для текста рациона", () => {
   assert.equal(fullDate("2026-10-05"), "пн, 5 октября 2026");
-  assert.equal(dayTextFileName("2026-10-05"), "рацион-2026-10-05.txt");
 });
 
 test("название приёма подставляется, если пользователь его не задал", () => {
