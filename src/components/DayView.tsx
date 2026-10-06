@@ -464,7 +464,11 @@ export default function DayView({
                   приёма живут в меню действий, копирования всей карточки на
                   завтра здесь больше нет. */}
               <IconBtn onClick={() => setMealMenu(meal)} title="Действия с приёмом" size={28}>
-                <span className="block -translate-y-[3px] text-[15px] leading-none">⋮</span>
+                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="12" cy="5" r="1.75" />
+                  <circle cx="12" cy="12" r="1.75" />
+                  <circle cx="12" cy="19" r="1.75" />
+                </svg>
               </IconBtn>
             </div>
 
