@@ -83,6 +83,11 @@ export interface WeighIn {
   weight: number;
 }
 
+export interface DayNote {
+  date: string; // YYYY-MM-DD
+  text: string;
+}
+
 /**
  * Продукт, скопированный на другой день, но ещё не разложенный по приёмам.
  * Живёт в корзине своего дня: пользователь зажимает продукт в корзине и
@@ -103,6 +108,8 @@ export interface AppState {
   products: Product[];
   meals: Meal[];
   weights: WeighIn[];
+  /** Личные заметки к выбранным дням дневника. */
+  notes: DayNote[];
   /** id-ы продуктов в порядке последнего использования (самый свежий — первый) */
   recentProductIds: string[];
   /** корзина: продукты, перенесённые на день, но ещё не разложенные по приёмам */

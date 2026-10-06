@@ -11,8 +11,8 @@ import {
 } from "../lib/basket";
 import type { BasketItem } from "../lib/types";
 import { sameBarcode } from "../lib/barcode";
-import { buildDayRationText, dayTextFileName } from "../lib/dayText";
-import { copyText, downloadTextFile } from "../lib/clipboard";
+import { buildDayRationText } from "../lib/dayText";
+import { copyText } from "../lib/clipboard";
 import { Bar, Btn, Empty, Field, IconBtn, Ring, Sheet, noSuggest, numField } from "./ui";
 import AddFood from "./AddFood";
 
@@ -47,6 +47,8 @@ export default function DayView({
   const [mealMenu, setMealMenu] = useState<Meal | null>(null);
   /** Продукт, который свайпом попросили удалить — ждём подтверждения */
   const [pendingDelete, setPendingDelete] = useState<EntryAction | null>(null);
+  /** Окно заметок к выбранному дню. */
+  const [notesOpen, setNotesOpen] = useState(false);
   /** Корзина дня открыта: продукты, перенесённые на этот день, ждут раскладки */
   const [basketOpen, setBasketOpen] = useState(false);
   /** Продукт, который сейчас тащат пальцем из корзины (и где палец) */
@@ -70,6 +72,7 @@ export default function DayView({
     () => state.meals.filter((m) => m.date === date).sort((a, b) => a.time.localeCompare(b.time)),
     [state.meals, date],
   );
+  const dayNote = state.notes.find((note) => note.date === date)?.text ?? "";
   const visibleMeals = useMemo(() => {
     if (!preview) return meals;
     return meals.map((meal) =>
@@ -99,6 +102,7 @@ export default function DayView({
     moveEntry ||
     deleteMeal ||
     calendarOpen ||
+    notesOpen ||
     mealMenu ||
     pendingDelete ||
     basketOpen ||
@@ -116,6 +120,14 @@ export default function DayView({
 
   const update = (fn: (ms: Meal[]) => Meal[]) => setState((s) => ({ ...s, meals: fn(s.meals) }));
 
+  function updateDayNote(text: string) {
+    setState((s) => {
+      const notes = s.notes.filter((note) => note.date !== date);
+      if (text.length) notes.push({ date, text });
+      return { ...s, notes };
+    });
+  }
+
   function notify(message: string) {
     if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current);
     setNotice(message);
@@ -128,20 +140,8 @@ export default function DayView({
   }
 
   async function copyDayRation() {
-    const text = dayRationText();
-    if (await copyText(text)) {
-      notify("Рацион скопирован — можно вставлять");
-      return;
-    }
-    // Буфера нет (приватный режим, встроенный браузер мессенджера) — отдаём файлом,
-    // чтобы рацион всё равно можно было забрать себе и отправить.
-    if (downloadTextFile(dayTextFileName(date), text)) notify("Буфер недоступен — сохранили файл .txt");
+    if (await copyText(dayRationText())) notify("Рацион скопирован — можно вставлять");
     else notify("Не получилось скопировать рацион");
-  }
-
-  function downloadDayRation() {
-    downloadTextFile(dayTextFileName(date), dayRationText());
-    notify("Рацион сохранён файлом .txt");
   }
 
   useEffect(() => {
@@ -407,8 +407,7 @@ export default function DayView({
       )}
       </div>
 
-      {/* Рацион дня одним текстом: норма в нём — та же, что стоит в настройках
-          профиля, поэтому копию удобно сразу отправить тренеру или в заметки. */}
+      {/* Рацион можно скопировать, а заметки хранятся отдельно для каждого дня. */}
       <div className="flex gap-2" data-no-swipe>
         <Btn
           variant="soft"
@@ -423,10 +422,10 @@ export default function DayView({
           variant="soft"
           size="sm"
           className="shrink-0"
-          onClick={downloadDayRation}
-          title="Скачать рацион за день файлом .txt"
+          onClick={() => setNotesOpen(true)}
+          title={dayNote.trim() ? "Открыть заметки за день" : "Добавить заметку за день"}
         >
-          Скачать .txt
+          📝 Заметки{dayNote.trim() && <span className="size-1.5 rounded-full bg-acc2" />}
         </Btn>
       </div>
 
@@ -723,6 +722,24 @@ export default function DayView({
             setCalendarOpen(false);
           }}
         />
+      </Sheet>
+
+      <Sheet open={notesOpen} onClose={() => setNotesOpen(false)} title={`Заметки · ${humanDate(date)}`} center>
+        <div className="space-y-3">
+          <Field label="Запись за этот день">
+            <textarea
+              className="field min-h-36 resize-y"
+              rows={6}
+              value={dayNote}
+              onChange={(event) => updateDayNote(event.target.value)}
+              placeholder="Самочувствие, тренировка, планы или любые заметки…"
+            />
+          </Field>
+          <p className="text-xs text-mute">Заметка сохраняется автоматически отдельно для каждого дня.</p>
+          <Btn className="w-full" onClick={() => setNotesOpen(false)}>
+            Готово
+          </Btn>
+        </div>
       </Sheet>
 
       {/* Корзина дня: продукты, перенесённые на этот день свайпом. Появляется

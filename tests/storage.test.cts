@@ -61,6 +61,27 @@ test("старый профиль без истории возврата не л
   assert.equal(state.profile.calorieAdjust, 0);
 });
 
+test("заметки сохраняются по дням и очищаются от некорректных записей", () => {
+  withStorage({
+    ...emptyState,
+    notes: [
+      { date: "2026-05-02", text: "Заметка за второй день" },
+      { date: "2026-05-01", text: "Старая запись" },
+      { date: "2026-05-01", text: "Обновлённая запись" },
+      { date: "не-дата", text: "Некорректная" },
+      { date: "2026-05-03", text: "   " },
+    ],
+  });
+  const state = loadState();
+  assert.deepEqual(state.notes, [
+    { date: "2026-05-01", text: "Обновлённая запись" },
+    { date: "2026-05-02", text: "Заметка за второй день" },
+  ]);
+
+  saveState(state);
+  assert.deepEqual(loadState().notes, state.notes);
+});
+
 test("общий замок профиля мигрирует старый замок калорий и сохраняет состояние", () => {
   withStorage({ ...emptyState, profile: { ...profile, calorieAdjustLocked: false } });
   const migrated = loadState();

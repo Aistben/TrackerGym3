@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { AppState, Profile } from "./types";
+import type { AppState, DayNote, Profile } from "./types";
 import { SEED_PRODUCTS } from "./seed";
 import { pruneBasket, sanitizeBasket } from "./basket";
 import { today } from "./nutrition";
@@ -11,6 +11,7 @@ export const emptyState: AppState = {
   products: SEED_PRODUCTS,
   meals: [],
   weights: [],
+  notes: [],
   recentProductIds: [],
   basket: [],
 };
@@ -42,6 +43,21 @@ function normalizeProfile(profile: Profile): Profile {
   delete clean.calorieAdjustLocked;
   delete clean.calorieAdjustLockInitialized;
   return { ...clean, profileSettingsLocked };
+}
+
+function normalizeNotes(value: unknown): DayNote[] {
+  if (!Array.isArray(value)) return [];
+  const byDate = new Map<string, string>();
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const note = item as Partial<DayNote>;
+    if (typeof note.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(note.date)) continue;
+    if (typeof note.text !== "string" || !note.text.trim()) continue;
+    byDate.set(note.date, note.text);
+  }
+  return [...byDate.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([date, text]) => ({ date, text }));
 }
 
 /** Нормализация используется и при чтении localStorage, и при импорте резервной копии. */
@@ -76,6 +92,7 @@ export function normalizeState(value: unknown): AppState {
     products: [...merged, ...SEED_PRODUCTS.filter((product) => !ids.has(product.id))],
     meals: Array.isArray(parsed.meals) ? parsed.meals : [],
     weights: Array.isArray(parsed.weights) ? parsed.weights : [],
+    notes: normalizeNotes(parsed.notes),
     recentProductIds: Array.isArray(parsed.recentProductIds) ? parsed.recentProductIds : [],
     // Корзина: и из localStorage, и из бэкапа берём только корректные позиции,
     // а неразобранное за месяц выбрасываем — чтобы список не пух вечно.
