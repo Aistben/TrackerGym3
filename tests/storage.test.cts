@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { SEED_PRODUCTS } from "../src/lib/seed";
 import { emptyState, loadState, saveState } from "../src/lib/storage";
+import { computeTargets, legacyTargets } from "../src/lib/nutrition";
 import type { Profile } from "../src/lib/types";
 
+/** Профиль текущей версии: норма БЖУ задаётся руками, темпа нет. */
 const profile: Profile = {
   name: "Тест",
   sex: "male",
@@ -13,9 +15,15 @@ const profile: Profile = {
   targetWeight: 75,
   activity: "moderate",
   goal: "lose",
-  pace: 0.5,
   startDate: "2026-01-01",
-  calorieAdjust: 0,
+};
+
+/** Профиль прошлых версий: с темпом (кг/нед) и слайдером корректировки калорий. */
+const legacyProfile: Profile = {
+  ...profile,
+  pace: 0.5,
+  calorieAdjust: 300,
+  calorieAdjustHistory: [0, 150],
   calorieAdjustLocked: false,
 };
 
@@ -40,25 +48,54 @@ test("ручные БЖУ из старых версий вычищаются п
   const state = loadState();
   assert.ok(state.profile);
   assert.ok(!("customMacros" in state.profile), "старые ручные макросы остались в профиле");
-  assert.equal(state.profile.calorieAdjust, 0);
+  // Новый профиль ручных БЖУ не имеет: норма пока считается по формуле.
+  assert.equal(state.profile.macroTargets, undefined);
 });
 
-test("история возврата корректировки живёт в профиле и переживает перезапуск", () => {
-  withStorage({ ...emptyState, profile: { ...profile, calorieAdjust: 300, calorieAdjustHistory: [0, 150] } });
-  const saved = loadState();
-  assert.deepEqual(saved.profile?.calorieAdjustHistory, [0, 150]);
-
-  // сохраняем поверх — стрелка ↩ должна помнить шаги и в новой сессии
-  saveState(saved);
-  assert.deepEqual(loadState().profile?.calorieAdjustHistory, [0, 150]);
-});
-
-test("старый профиль без истории возврата не ломается", () => {
-  withStorage({ ...emptyState, profile });
+test("норма старого профиля замораживается в ручные БЖУ и не «прыгает»", () => {
+  withStorage({ ...emptyState, profile: legacyProfile, weights: [{ date: "2026-02-01", weight: 78 }] });
   const state = loadState();
   assert.ok(state.profile);
-  assert.equal(state.profile.calorieAdjustHistory, undefined);
-  assert.equal(state.profile.calorieAdjust, 0);
+
+  // Темп и корректировка из профиля убраны, а их результат остался в БЖУ.
+  assert.equal(state.profile.pace, undefined);
+  assert.equal(state.profile.calorieAdjust, undefined);
+  assert.deepEqual(state.profile.macroTargets, legacyTargets(legacyProfile, 78));
+
+  // Калории дня остались теми же, что человек видел до обновления (±округление).
+  const before = legacyTargets(legacyProfile, 78);
+  const legacyKcal = before.protein * 4 + before.fat * 9 + before.carbs * 4;
+  assert.ok(Math.abs(computeTargets(state.profile, 78).calories - legacyKcal) <= 2);
+});
+
+test("ручные БЖУ сохраняются и переживают перезапуск", () => {
+  withStorage({ ...emptyState, profile });
+  const state = loadState();
+  const withMacros = {
+    ...state,
+    profile: { ...state.profile!, macroTargets: { protein: 160, fat: 70, carbs: 250 } },
+  };
+  saveState(withMacros);
+
+  const saved = loadState();
+  assert.deepEqual(saved.profile?.macroTargets, { protein: 160, fat: 70, carbs: 250 });
+  assert.equal(computeTargets(saved.profile!, 80).calories, 160 * 4 + 70 * 9 + 250 * 4);
+});
+
+test("битые значения БЖУ в профиле игнорируются, а не ломают норму", () => {
+  withStorage({
+    ...emptyState,
+    profile: { ...profile, macroTargets: { protein: "160", fat: null, carbs: 250 } as unknown as Profile["macroTargets"] },
+  });
+  const state = loadState();
+  assert.equal(state.profile?.macroTargets, undefined);
+  assert.ok(computeTargets(state.profile!, 80).calories > 0);
+
+  withStorage({
+    ...emptyState,
+    profile: { ...profile, macroTargets: { protein: 160.4, fat: 70, carbs: -20 } },
+  });
+  assert.deepEqual(loadState().profile?.macroTargets, { protein: 160, fat: 70, carbs: 0 });
 });
 
 test("заметки сохраняются по дням и очищаются от некорректных записей", () => {
@@ -83,7 +120,7 @@ test("заметки сохраняются по дням и очищаются 
 });
 
 test("общий замок профиля мигрирует старый замок калорий и сохраняет состояние", () => {
-  withStorage({ ...emptyState, profile: { ...profile, calorieAdjustLocked: false } });
+  withStorage({ ...emptyState, profile: { ...legacyProfile, calorieAdjustLocked: false } });
   const migrated = loadState();
   assert.equal(migrated.profile?.profileSettingsLocked, true);
   assert.equal(migrated.profile?.calorieAdjustLocked, undefined);
@@ -100,7 +137,7 @@ test("общий замок профиля мигрирует старый за�
 test("явно снятый старый замок калорий становится снятым общим замком", () => {
   withStorage({
     ...emptyState,
-    profile: { ...profile, calorieAdjustLocked: false, calorieAdjustLockInitialized: true },
+    profile: { ...legacyProfile, calorieAdjustLocked: false, calorieAdjustLockInitialized: true },
   });
   assert.equal(loadState().profile?.profileSettingsLocked, false);
 });

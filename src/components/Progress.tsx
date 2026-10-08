@@ -12,7 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import type { AppState, Targets } from "../lib/types";
-import { GOALS, dateRange, dayTotals, daysBetween, etaDays, round, shiftDate, shortDate, today, weightSeries } from "../lib/nutrition";
+import { GOALS, dateRange, dayTotals, daysBetween, lastWeighIn, round, shortDate, today, weightSeries } from "../lib/nutrition";
 import { Btn, Empty, Field, Select, Sheet, numField } from "./ui";
 
 const RANGES = [
@@ -23,7 +23,7 @@ const RANGES = [
   { d: 365, label: "Год", hint: "12 месяцев" },
 ];
 
-/** Цвета графика: фиолетовый — факт, бирюзовый пунктир — план и цель. */
+/** Цвета графика: фиолетовый — факт (вес), бирюзовый пунктир — линия цели. */
 const WEIGHT_COLOR = "#a855f7";
 const PLAN_COLOR = "#2dd4bf";
 
@@ -45,20 +45,10 @@ export default function Progress({
 
   const days = useMemo(() => dateRange(todayDate, range), [todayDate, range]);
 
-  // Якорь плана — последнее взвешивание на сегодня (актуальный вес),
-  // чтобы линия плана всегда стартовала от реальности и шла к текущей цели.
-  const anchor = useMemo(() => {
-    const last = [...state.weights]
-      .filter((item) => item.date <= todayDate)
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .at(-1);
-    return last ?? { date: profile.startDate, weight: profile.startWeight };
-  }, [state.weights, profile.startDate, profile.startWeight, todayDate]);
-
-  /** График — только вес: линия факта и пунктир плана. */
+  /** График — только вес: линия факта и линия цели. Плана от темпа больше нет. */
   const weightData = useMemo(
-    () => weightSeries({ days, weights: state.weights, profile, anchor }),
-    [days, state.weights, profile, anchor],
+    () => weightSeries({ days, weights: state.weights, profile }),
+    [days, state.weights, profile],
   );
 
   // Средние калории и белок считаются по дневнику за выбранный период.
@@ -74,26 +64,18 @@ export default function Progress({
 
   const avg = logged.length ? round(logged.reduce((s, total) => s + total.kcal, 0) / logged.length) : 0;
   const avgP = logged.length ? round(logged.reduce((s, total) => s + total.protein, 0) / logged.length) : 0;
-  const eta = etaDays(profile, currentWeight);
   const delta = round(currentWeight - profile.startWeight, 1);
 
   const weighInsInWindow = weightData.filter((d) => d.факт != null).length;
-  const lastWeighIn = useMemo(
-    () =>
-      [...state.weights]
-        .filter((item) => item.date <= todayDate)
-        .sort((a, b) => a.date.localeCompare(b.date))
-        .at(-1) ?? null,
-    [state.weights, todayDate],
-  );
+  const lastWeigh = useMemo(() => lastWeighIn(state.weights, todayDate), [state.weights, todayDate]);
   // Взвешивание могло быть раньше выбранного периода: тогда линия веса пропадает,
   // и это выглядит как «график сломался». Предлагаем одним касанием расширить период.
   const widerRange = useMemo(() => {
-    if (!lastWeighIn) return null;
-    const need = daysBetween(lastWeighIn.date, todayDate) + 1;
+    if (!lastWeigh) return null;
+    const need = daysBetween(lastWeigh.date, todayDate) + 1;
     const fit = RANGES.find((item) => item.d >= need) ?? RANGES[RANGES.length - 1];
     return fit.d > range ? fit : null;
-  }, [lastWeighIn, todayDate, range]);
+  }, [lastWeigh, todayDate, range]);
 
   return (
     <div className="space-y-4 pb-28">
@@ -122,15 +104,15 @@ export default function Progress({
             </Btn>
           </div>
           <p className="text-[11px] text-mute">
-            Фиолетовая линия — вес, бирюзовый пунктир — план и цель. Проведи пальцем по графику, чтобы увидеть день.
+            Фиолетовая линия — вес, бирюзовый пунктир — линия цели. Проведи пальцем по графику, чтобы увидеть день.
           </p>
         </div>
 
-        {weighInsInWindow === 0 && widerRange && lastWeighIn && (
+        {weighInsInWindow === 0 && widerRange && lastWeigh && (
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-[11px] leading-snug text-warn">
             <span className="min-w-0 flex-1">
-              В этом периоде нет взвешиваний — последнее {shortDate(lastWeighIn.date)} (
-              {daysBetween(lastWeighIn.date, todayDate)} дн. назад), поэтому линия веса пустая.
+              В этом периоде нет взвешиваний — последнее {shortDate(lastWeigh.date)} (
+              {daysBetween(lastWeigh.date, todayDate)} дн. назад), поэтому линия веса пустая.
             </span>
             <button
               type="button"
@@ -167,15 +149,6 @@ export default function Progress({
               <YAxis tick={{ fontSize: 10, fill: "#b0a2cf" }} domain={["dataMin - 1.5", "dataMax + 1.5"]} />
               <Tooltip contentStyle={tipStyle} labelStyle={{ color: "#b0a2cf" }} />
               <ReferenceLine y={profile.targetWeight} stroke={PLAN_COLOR} strokeDasharray="4 4" />
-              <Line
-                type="monotone"
-                dataKey="план"
-                name="План, кг"
-                stroke={PLAN_COLOR}
-                strokeWidth={1.6}
-                strokeDasharray="5 5"
-                dot={false}
-              />
               <Area
                 type="monotone"
                 dataKey="факт"
@@ -197,12 +170,6 @@ export default function Progress({
               <Legend verticalAlign="bottom" height={20} wrapperStyle={{ fontSize: 11, color: "#b0a2cf" }} />
             </ComposedChart>
           </ResponsiveContainer>
-        )}
-        {eta !== null && eta > 0 && (
-          <p className="mt-2 text-xs text-mute">
-            При темпе {profile.pace} кг/нед цель достижима примерно через <b className="text-ink">{eta} дн.</b> (
-            {shortDate(shiftDate(today(), eta))})
-          </p>
         )}
       </div>
 

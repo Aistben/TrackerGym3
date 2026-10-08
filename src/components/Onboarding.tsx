@@ -12,7 +12,6 @@ export default function Onboarding({ onDone }: { onDone: (p: Profile) => void })
   const [weight, setWeight] = useState("80");
   const [target, setTarget] = useState("75");
   const [activity, setActivity] = useState<ActivityKey>("moderate");
-  const [pace, setPace] = useState("0.5");
 
   const profile: Profile = useMemo(
     () => ({
@@ -24,12 +23,10 @@ export default function Onboarding({ onDone }: { onDone: (p: Profile) => void })
       targetWeight: +target || +weight || 75,
       activity,
       goal,
-      pace: goal === "maintain" ? 0 : +pace || 0.5,
       startDate: today(),
-      calorieAdjust: 0,
       profileSettingsLocked: true,
     }),
-    [sex, age, height, weight, target, activity, goal, pace],
+    [sex, age, height, weight, target, activity, goal],
   );
 
   const t = computeTargets(profile, profile.startWeight);
@@ -39,7 +36,7 @@ export default function Onboarding({ onDone }: { onDone: (p: Profile) => void })
       <div>
         <div className="text-xs tracking-[0.2em] text-acc uppercase">Шаг {step + 1} из 3</div>
         <h1 className="mt-1 text-2xl font-bold">
-          {step === 0 ? "Какая цель?" : step === 1 ? "Параметры тела" : "Активность и темп"}
+          {step === 0 ? "Какая цель?" : step === 1 ? "Параметры тела" : "Активность"}
         </h1>
       </div>
 
@@ -135,19 +132,6 @@ export default function Onboarding({ onDone }: { onDone: (p: Profile) => void })
               </button>
             ))}
           </div>
-          {goal !== "maintain" && (
-            <Field label={`Темп: ${pace} кг в неделю`} hint="0.3–0.5 кг/нед — оптимально и безопасно">
-              <input
-                type="range"
-                min={0.1}
-                max={1}
-                step={0.1}
-                value={pace}
-                onChange={(e) => setPace(e.target.value)}
-                className="w-full accent-[#2dd4bf]"
-              />
-            </Field>
-          )}
         </div>
       )}
 
@@ -156,6 +140,9 @@ export default function Onboarding({ onDone }: { onDone: (p: Profile) => void })
         <div className="text-3xl font-bold text-acc">{t.calories} ккал</div>
         <div className="mt-1 text-xs text-mute">
           Б {t.protein} г · Ж {t.fat} г · У {t.carbs} г · TDEE {t.tdee}
+        </div>
+        <div className="mt-2 text-[11px] leading-snug text-mute">
+          Это расчётная норма. БЖУ можно вписать своё в настройках — «Профиль» → 🔓.
         </div>
       </div>
 

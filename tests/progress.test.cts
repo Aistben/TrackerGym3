@@ -12,9 +12,7 @@ const profile: Profile = {
   targetWeight: 75,
   activity: "light",
   goal: "lose",
-  pace: 0.5,
   startDate: "2026-09-01",
-  calorieAdjust: 0,
 };
 
 test("график веса: точка на каждый день, вес — только в дни взвешиваний", () => {
@@ -29,19 +27,25 @@ test("график веса: точка на каждый день, вес — �
   assert.equal(series[0].факт, undefined, "в день без взвешивания вес не рисуется");
   assert.equal(series[1].факт, 79.4);
   assert.equal(series[2].факт, 79.1);
-  // Пунктир плана должен быть в каждой точке, иначе линия обрывается.
-  assert.ok(series.every((point) => typeof point.план === "number"), "план должен быть в каждой точке");
-  assert.ok(series[0].план >= 75 && series[2].план <= series[0].план + 1e-9, "план идёт вниз, но не ниже цели");
 });
 
-test("в точках графика нет ничего кроме веса и плана", () => {
+test("плана от темпа в точках графика больше нет", () => {
+  const series = weightSeries({
+    days: dateRange("2026-09-30", 2),
+    weights: [{ date: "2026-09-30", weight: 79 }],
+    profile,
+  });
+  assert.ok(series.every((point) => !("план" in point)), "точки плана остались");
+});
+
+test("в точках графика нет ничего кроме веса и подписей дня", () => {
   const series = weightSeries({
     days: dateRange("2026-09-30", 2),
     weights: [{ date: "2026-09-30", weight: 79 }],
     profile,
   });
   for (const point of series) {
-    assert.deepEqual(Object.keys(point).sort(), ["date", "day", "iso", "факт", "план"].filter((key) => key in point).sort());
+    assert.deepEqual(Object.keys(point).sort(), ["date", "day", "iso", "факт"].filter((key) => key in point).sort());
   }
 });
 
@@ -68,7 +72,6 @@ test("без взвешиваний линия веса пустая, но гр�
   const series = weightSeries({ days: dateRange(today(), 7), weights: [], profile: { ...profile, startDate: "2020-01-01" } });
   assert.equal(series.length, 7);
   assert.equal(series.filter((point) => point.факт != null).length, 0);
-  assert.equal(series.filter((point) => point.план != null).length, 7);
 });
 
 test("одно взвешивание даёт одну точку, а не пустой график", () => {

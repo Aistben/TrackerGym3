@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import type { AppState, DayNote, Profile } from "./types";
+import type { AppState, DayNote, Profile, WeighIn } from "./types";
 import { SEED_PRODUCTS } from "./seed";
 import { pruneBasket, sanitizeBasket } from "./basket";
-import { today } from "./nutrition";
+import { currentWeight, legacyTargets, stepMacro, today } from "./nutrition";
 
 const KEY = "nutri-tracker-v1";
 
@@ -28,10 +28,15 @@ function dropLegacyMacros(profile: Profile): Profile {
 }
 
 /**
- * Переносим прежний замок слайдера на общий замок настроек профиля.
- * Старые профили без явного решения по замку остаются заблокированными.
+ * Приводим профиль к текущей модели настроек:
+ *
+ * - прежний замок слайдера переносим на общий замок всего блока настроек;
+ * - убранные темп (кг/нед) и слайдер «ручная корректировка» больше не храним;
+ * - у профилей, где они были, БЖУ один раз замораживаются в ручные значения
+ *   (та же норма, что человек видел до обновления) — чтобы цифры не «прыгнули».
+ *   Новый профиль ручных БЖУ не имеет: пока их не задали, работает формула.
  */
-function normalizeProfile(profile: Profile): Profile {
+function normalizeProfile(profile: Profile, weights: WeighIn[]): Profile {
   const clean = dropLegacyMacros(profile);
   const profileSettingsLocked =
     typeof clean.profileSettingsLocked === "boolean"
@@ -40,9 +45,20 @@ function normalizeProfile(profile: Profile): Profile {
         ? clean.calorieAdjustLocked ?? true
         : true;
 
+  const macros = clean.macroTargets;
+  const macroTargets =
+    macros && [macros.protein, macros.fat, macros.carbs].every((item) => typeof item === "number" && Number.isFinite(item))
+      ? { protein: stepMacro(macros.protein), fat: stepMacro(macros.fat), carbs: stepMacro(macros.carbs) }
+      : typeof clean.pace === "number" || typeof clean.calorieAdjust === "number"
+        ? legacyTargets(clean, currentWeight(clean, weights))
+        : undefined;
+
   delete clean.calorieAdjustLocked;
   delete clean.calorieAdjustLockInitialized;
-  return { ...clean, profileSettingsLocked };
+  delete clean.pace;
+  delete clean.calorieAdjust;
+  delete clean.calorieAdjustHistory;
+  return { ...clean, profileSettingsLocked, macroTargets };
 }
 
 function normalizeNotes(value: unknown): DayNote[] {
@@ -63,7 +79,9 @@ function normalizeNotes(value: unknown): DayNote[] {
 /** Нормализация используется и при чтении localStorage, и при импорте резервной копии. */
 export function normalizeState(value: unknown): AppState {
   const parsed = value && typeof value === "object" && !Array.isArray(value) ? (value as Partial<AppState>) : {};
-  const profile = parsed.profile && typeof parsed.profile === "object" ? normalizeProfile(parsed.profile as Profile) : null;
+  const weights = Array.isArray(parsed.weights) ? parsed.weights : [];
+  const profile =
+    parsed.profile && typeof parsed.profile === "object" ? normalizeProfile(parsed.profile as Profile, weights) : null;
   const products = Array.isArray(parsed.products) ? parsed.products : [];
   const ids = new Set(products.map((product) => product.id));
   const seedById = new Map(SEED_PRODUCTS.map((product) => [product.id, product]));
@@ -91,7 +109,7 @@ export function normalizeState(value: unknown): AppState {
     profile,
     products: [...merged, ...SEED_PRODUCTS.filter((product) => !ids.has(product.id))],
     meals: Array.isArray(parsed.meals) ? parsed.meals : [],
-    weights: Array.isArray(parsed.weights) ? parsed.weights : [],
+    weights,
     notes: normalizeNotes(parsed.notes),
     recentProductIds: Array.isArray(parsed.recentProductIds) ? parsed.recentProductIds : [],
     // Корзина: и из localStorage, и из бэкапа берём только корректные позиции,
