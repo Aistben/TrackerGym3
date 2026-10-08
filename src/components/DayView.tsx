@@ -466,36 +466,39 @@ export default function DayView({
               dropTarget === meal.id ? "ring-2 ring-acc2 shadow-[0_0_0_4px_rgb(45_212_191_/_0.18)]" : ""
             }`}
           >
-            <div className="flex items-center gap-1.5 border-b border-line px-3 py-2.5">
-              <button
-                type="button"
-                onClick={() => setTimePick(meal)}
-                title="Выбрать время"
-                className="shrink-0 rounded-lg bg-acc/12 px-2 py-1.5 font-mono text-xs font-semibold whitespace-nowrap text-acc2 transition hover:bg-acc/20"
-              >
-                {meal.time}
-              </button>
-              <div className="min-w-0 flex-1">
-                {meal.title?.trim() && meal.title.trim() !== "Приём" && (
-                  <div className="break-words text-sm leading-snug font-semibold">{meal.title.trim()}</div>
-                )}
-                <div className="flex min-w-0 flex-wrap items-center gap-x-1 text-[10px] leading-snug font-semibold">
-                  <span className="whitespace-nowrap text-ink">{round(t.kcal)} ккал</span>
-                  <span className="whitespace-nowrap text-acc2">· Б {round(t.protein)}</span>
-                  <span className="whitespace-nowrap text-warn">· Ж {round(t.fat)}</span>
-                  <span className="whitespace-nowrap text-acc">· У {round(t.carbs)}</span>
+            <div className="border-b border-line px-3 py-2.5">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setTimePick(meal)}
+                  title="Выбрать время"
+                  className="shrink-0 rounded-lg bg-acc/12 px-2 py-1.5 font-mono text-xs font-semibold whitespace-nowrap text-acc2 transition hover:bg-acc/20"
+                >
+                  {meal.time}
+                </button>
+                <div className="min-w-0 flex-1">
+                  {meal.title?.trim() && meal.title.trim() !== "Приём" && (
+                    <div className="break-words text-sm leading-snug font-semibold">{meal.title.trim()}</div>
+                  )}
                 </div>
+                {/* Одна кнопка «⋮» вместо трёх значков: дублирование и удаление
+                    приёма живут в меню действий, копирования всей карточки на
+                    завтра здесь больше нет. */}
+                <IconBtn onClick={() => setMealMenu(meal)} title="Действия с приёмом" size={28}>
+                  <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="5" r="1.75" />
+                    <circle cx="12" cy="12" r="1.75" />
+                    <circle cx="12" cy="19" r="1.75" />
+                  </svg>
+                </IconBtn>
               </div>
-              {/* Одна кнопка «⋮» вместо трёх значков: дублирование и удаление
-                  приёма живут в меню действий, копирования всей карточки на
-                  завтра здесь больше нет. */}
-              <IconBtn onClick={() => setMealMenu(meal)} title="Действия с приёмом" size={28}>
-                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <circle cx="12" cy="5" r="1.75" />
-                  <circle cx="12" cy="12" r="1.75" />
-                  <circle cx="12" cy="19" r="1.75" />
-                </svg>
-              </IconBtn>
+              {/* Итоги приёма идут под временем, у левого края: время сверху, БЖУ под ним. */}
+              <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-1 text-[10px] leading-snug font-semibold">
+                <span className="whitespace-nowrap text-ink">{round(t.kcal)} ккал</span>
+                <span className="whitespace-nowrap text-acc2">· Б {round(t.protein)}</span>
+                <span className="whitespace-nowrap text-warn">· Ж {round(t.fat)}</span>
+                <span className="whitespace-nowrap text-acc">· У {round(t.carbs)}</span>
+              </div>
             </div>
 
             <div className="divide-y divide-line">
