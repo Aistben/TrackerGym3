@@ -5,7 +5,6 @@ import { uid } from "../lib/storage";
 import { hasNutrition, lookupBarcode, searchOnline } from "../lib/openfoodfacts";
 import { productMatchesBarcode, sameBarcode } from "../lib/barcode";
 import { searchProducts } from "../lib/search";
-import { estimateFromProducts, estimateFromTable, estimateToDraft, suggestFoods, type Estimate } from "../lib/estimate";
 import { Btn, Empty, Field, IconBtn, Sheet, Tabs, noSuggest, numField } from "./ui";
 import Scanner from "./Scanner";
 
@@ -59,58 +58,6 @@ export default function AddFood({
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
   const [draft, setDraft] = useState({ ...blankDraft });
   const searchRef = useRef<HTMLInputElement>(null);
-
-  /* ---------- оценка БЖУ по названию (когда нечего сканировать) ---------- */
-  const [estimateOpen, setEstimateOpen] = useState(false);
-  const [estimateQuery, setEstimateQuery] = useState("");
-  const [onlineEstimate, setOnlineEstimate] = useState<Estimate | null>(null);
-  const [estimateLoading, setEstimateLoading] = useState(false);
-  const estimateAbort = useRef<AbortController | null>(null);
-
-  const localEstimates = useMemo(() => {
-    const query = estimateQuery.trim();
-    if (query.length < 2) return [];
-    return suggestFoods(query, 4).map((match) => estimateFromTable(match.food.name)) as Estimate[];
-  }, [estimateQuery]);
-
-  function openEstimate(query: string) {
-    setEstimateQuery(query);
-    setOnlineEstimate(null);
-    setEstimateOpen(true);
-  }
-
-  async function searchSimilarOnline() {
-    const query = estimateQuery.trim();
-    if (query.length < 2) return;
-    estimateAbort.current?.abort();
-    const controller = new AbortController();
-    estimateAbort.current = controller;
-    setEstimateLoading(true);
-    setOnlineEstimate(null);
-    try {
-      const found = await searchOnline(query, controller.signal);
-      if (controller.signal.aborted) return;
-      const estimate = estimateFromProducts(query, found);
-      if (estimate) {
-        setOnlineEstimate(estimate);
-      } else {
-        setNotice("Похожих продуктов в Open Food Facts не нашлось — впиши БЖУ с упаковки или выбери блюдо из справочника.");
-      }
-    } catch {
-      if (!controller.signal.aborted) setNotice("Не получилось связаться с Open Food Facts. Проверь интернет.");
-    } finally {
-      if (!controller.signal.aborted) setEstimateLoading(false);
-    }
-  }
-
-  useEffect(() => () => estimateAbort.current?.abort(), []);
-
-  function applyEstimate(estimate: Estimate) {
-    setDraft({ ...blankDraft, ...estimateToDraft(estimate) });
-    setEstimateOpen(false);
-    setNotice(`Ориентировочно: ${estimate.basis}. Проверь цифры и сохрани.`);
-    setMode("form");
-  }
 
   useEffect(() => {
     onModeChange?.(mode);
@@ -550,66 +497,9 @@ export default function AddFood({
   /* ---------- сканер ---------- */
   if (mode === "scan") return <Scanner onDetect={handleCode} onClose={() => (openedDirectlyInScanner ? onClose() : setMode("search"))} />;
 
-  /* Лист оценки нужен в двух режимах: из поиска и из карточки продукта. */
-  const estimateSheet = (
-    <Sheet open={estimateOpen} onClose={() => setEstimateOpen(false)} title="Оценить БЖУ по названию" center>
-      <div className="space-y-3">
-        <input
-          className="field compact"
-          {...noSuggest}
-          autoFocus
-          placeholder="Например: шаурма, борщ, творожная запеканка"
-          value={estimateQuery}
-          onChange={(e) => {
-            setEstimateQuery(e.target.value);
-            setOnlineEstimate(null);
-          }}
-        />
-        <p className="text-[11px] leading-snug text-mute">
-          Введи, что съел, — приложение подберёт похожее блюдо из справочника и подставит примерные калории и БЖУ.
-          Значения ориентировочные: проверь и поправь перед сохранением.
-        </p>
-
-        {localEstimates.length > 0 && (
-          <div className="space-y-1.5">
-            <div className="text-[11px] font-medium tracking-wide text-mute uppercase">Похожие блюда</div>
-            {localEstimates.map((estimate) => (
-              <EstimateRow key={estimate.basis + estimate.kcal} estimate={estimate} onPick={applyEstimate} />
-            ))}
-          </div>
-        )}
-
-        {estimateQuery.trim().length >= 2 && !localEstimates.length && !estimateLoading && !onlineEstimate && (
-          <div className="rounded-xl border border-line bg-panel2/60 px-3 py-2 text-[11px] leading-snug text-mute">
-            В справочнике типовых блюд похожего нет. Можно поискать среди реальных продуктов Open Food Facts — посчитаем среднее.
-          </div>
-        )}
-
-        {onlineEstimate && (
-          <div className="space-y-1.5">
-            <div className="text-[11px] font-medium tracking-wide text-mute uppercase">По реальным продуктам</div>
-            <EstimateRow estimate={onlineEstimate} onPick={applyEstimate} />
-          </div>
-        )}
-
-        <Btn
-          variant="soft"
-          size="sm"
-          className="w-full"
-          disabled={estimateQuery.trim().length < 2 || estimateLoading}
-          onClick={searchSimilarOnline}
-        >
-          {estimateLoading ? "Ищем в Open Food Facts…" : "🔎 Поискать похожие в Open Food Facts"}
-        </Btn>
-      </div>
-    </Sheet>
-
-  );
-
   /* ---------- создание / редактирование продукта ---------- */
   if (mode === "form") {
     return (
-      <>
       <div className="space-y-2">
         {notice && <div className="rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-[11px] leading-snug text-warn">{notice}</div>}
         <Field label="Название">
@@ -654,14 +544,6 @@ export default function AddFood({
             </Field>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={() => openEstimate(draft.name)}
-          disabled={draft.name.trim().length < 2}
-          className="w-full rounded-xl border border-dashed border-line px-3 py-2 text-[13px] text-mute transition enabled:hover:border-acc/50 enabled:hover:text-acc disabled:opacity-50"
-        >
-          🤔 Не знаю БЖУ — подобрать по названию
-        </button>
         <div className="flex gap-2 pt-1">
           <Btn variant="soft" size="sm" className="flex-1" onClick={() => setMode("search")}>
             Назад
@@ -671,8 +553,6 @@ export default function AddFood({
           </Btn>
         </div>
       </div>
-      {estimateSheet}
-      </>
     );
   }
 
@@ -708,12 +588,6 @@ export default function AddFood({
 
       <div className="grid grid-cols-1 gap-1.5">
         <button
-          onClick={() => openEstimate(q)}
-          className="w-full rounded-xl border border-dashed border-acc/40 bg-acc/5 px-3 py-2 text-[13px] text-acc transition hover:bg-acc/10"
-        >
-          🤔 Не знаю БЖУ — оценить по названию
-        </button>
-        <button
           onClick={openCreate}
           className="w-full rounded-xl border border-dashed border-line px-3 py-2 text-[13px] text-mute transition hover:border-acc/50 hover:text-acc"
         >
@@ -722,28 +596,6 @@ export default function AddFood({
       </div>
 
       <div className="space-y-1.5">
-        {q.trim().length >= 2 && (
-          <button
-            onClick={() => openEstimate(q)}
-            className="flex w-full items-center gap-2 rounded-xl border border-dashed border-acc/40 bg-acc/5 px-2.5 py-2 text-left transition hover:bg-acc/10 active:scale-[0.99]"
-          >
-            <span className="min-w-0 flex-1">
-              <span className="block text-[13px] leading-snug font-medium text-acc break-words">Нет в базе? Оценить «{q.trim()}»</span>
-              <span className="mt-0.5 block text-[11px] leading-snug text-mute">
-                {estimateFromTable(q) ? "подставим типовое блюдо из справочника" : "подберём похожее блюдо или среднее по Open Food Facts"}
-              </span>
-            </span>
-            {(() => {
-              const estimate = estimateFromTable(q);
-              return estimate ? (
-                <span className="shrink-0 text-right text-xs leading-tight font-semibold text-acc">
-                  ≈{Math.round(estimate.kcal)}
-                  <span className="block text-[9px] font-normal text-mute">ккал/100г</span>
-                </span>
-              ) : null;
-            })()}
-          </button>
-        )}
         {found.fuzzy && list.length > 0 && (
           <div className="rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-[11px] leading-snug text-warn">
             Точного совпадения нет — ниже похожие продукты. Проверь название и БЖУ.
@@ -756,7 +608,7 @@ export default function AddFood({
           <Empty icon="🕘" text="Пока нет недавних продуктов — добавь что-нибудь из базы" />
         )}
         {!list.length && lib === "base" && !online.length && !loading && (
-          <Empty icon="🔍" text="Ничего не нашлось — проверь название, отсканируй штрихкод или оцени БЖУ по названию" />
+          <Empty icon="🔍" text="Ничего не нашлось — проверь название или отсканируй штрихкод" />
         )}
 
         {lib === "base" && (loading || online.length > 0) && (
@@ -767,8 +619,6 @@ export default function AddFood({
         {lib === "base" &&
           online.map((p) => <Row key={p.id} p={p} online onClick={() => pick(p, true)} />)}
       </div>
-
-      {estimateSheet}
 
       <Sheet open={!!deleteProduct} onClose={() => setDeleteProduct(null)} title="Удалить продукт?" center>
         {deleteProduct && (
@@ -793,29 +643,6 @@ export default function AddFood({
         )}
       </Sheet>
     </div>
-  );
-}
-
-function EstimateRow({ estimate, onPick }: { estimate: Estimate; onPick: (estimate: Estimate) => void }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onPick(estimate)}
-      className="flex w-full items-center gap-2 rounded-xl border border-line bg-panel2/60 px-2.5 py-2 text-left transition hover:border-acc2/60 active:scale-[0.99]"
-    >
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm leading-snug font-medium break-words">{estimate.name}</span>
-        <span className="mt-0.5 block text-[11px] leading-snug text-mute">
-          {estimate.basis} · {estimate.confidence === "high" ? "уверенно" : estimate.confidence === "medium" ? "примерно" : "очень грубо"}
-        </span>
-      </span>
-      <span className="shrink-0 text-right text-xs leading-tight font-semibold text-acc">
-        {Math.round(estimate.kcal)}
-        <span className="block text-[9px] font-normal text-mute">
-          Б {estimate.protein} · Ж {estimate.fat} · У {estimate.carbs}
-        </span>
-      </span>
-    </button>
   );
 }
 
