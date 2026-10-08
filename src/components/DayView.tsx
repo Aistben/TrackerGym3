@@ -467,44 +467,40 @@ export default function DayView({
             }`}
           >
             <div className="border-b border-line px-3 py-2.5">
-              {/* Верхняя строка: название слева, время строго по центру, «⋮» справа. */}
-              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5">
-                <div className="min-w-0 justify-self-start">
-                  {meal.title?.trim() && meal.title.trim() !== "Приём" && (
-                    <div className="break-words text-sm leading-snug font-semibold">{meal.title.trim()}</div>
-                  )}
-                </div>
+              {/* Верхняя строка: время у левого края, название рядом, «⋮» справа. */}
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => setTimePick(meal)}
                   title="Выбрать время"
-                  className="rounded-lg bg-acc/12 px-2 py-1.5 font-mono text-xs font-semibold whitespace-nowrap text-acc2 transition hover:bg-acc/20"
+                  className="shrink-0 rounded-lg bg-acc/12 px-2 py-1.5 font-mono text-xs font-semibold whitespace-nowrap text-acc2 transition hover:bg-acc/20"
                 >
                   {meal.time}
                 </button>
+                <div className="min-w-0 flex-1">
+                  {meal.title?.trim() && meal.title.trim() !== "Приём" && (
+                    <div className="break-words text-sm leading-snug font-semibold">{meal.title.trim()}</div>
+                  )}
+                </div>
                 {/* Одна кнопка «⋮» вместо трёх значков: дублирование и удаление
                     приёма живут в меню действий, копирования всей карточки на
                     завтра здесь больше нет. */}
-                <div className="flex justify-self-end">
-                  <IconBtn onClick={() => setMealMenu(meal)} title="Действия с приёмом" size={28}>
-                    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                      <circle cx="12" cy="5" r="1.75" />
-                      <circle cx="12" cy="12" r="1.75" />
-                      <circle cx="12" cy="19" r="1.75" />
-                    </svg>
-                  </IconBtn>
-                </div>
+                <IconBtn onClick={() => setMealMenu(meal)} title="Действия с приёмом" size={28}>
+                  <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="5" r="1.75" />
+                    <circle cx="12" cy="12" r="1.75" />
+                    <circle cx="12" cy="19" r="1.75" />
+                  </svg>
+                </IconBtn>
               </div>
-              {/* Нижняя строка: БЖУ растянуты по центру, калории — у правого края.
-                  Слева и справа одинаковые колонки, поэтому БЖУ стоят строго по центру. */}
-              <div className="mt-1.5 grid grid-cols-[4rem_1fr_4rem] items-center gap-2 text-[10px] leading-snug font-semibold">
-                <div />
-                <div className="flex min-w-0 items-center justify-evenly">
+              {/* Нижняя строка: БЖУ под временем у левого края, калории — у правого. */}
+              <div className="mt-1.5 flex min-w-0 items-center justify-between gap-2 text-[10px] leading-snug font-semibold">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-1">
                   <span className="whitespace-nowrap text-acc2">Б {round(t.protein)}</span>
-                  <span className="whitespace-nowrap text-warn">Ж {round(t.fat)}</span>
-                  <span className="whitespace-nowrap text-acc">У {round(t.carbs)}</span>
+                  <span className="whitespace-nowrap text-warn">· Ж {round(t.fat)}</span>
+                  <span className="whitespace-nowrap text-acc">· У {round(t.carbs)}</span>
                 </div>
-                <span className="justify-self-end whitespace-nowrap text-ink">{round(t.kcal)} ккал</span>
+                <span className="shrink-0 whitespace-nowrap text-ink">{round(t.kcal)} ккал</span>
               </div>
             </div>
 
