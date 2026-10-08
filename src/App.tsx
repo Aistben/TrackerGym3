@@ -65,6 +65,12 @@ export default function App() {
     [state.profile, weight],
   );
 
+  // Все хуки вызываются до раннего возврата на онбординг. Иначе, когда появляется
+  // профиль, число хуков меняется, React выбрасывает ошибку и экран становится чёрным.
+  // Дневник гасит флаг сразу после обработки — иначе добавление открывалось бы
+  // само при каждом возврате на вкладку «Дневник».
+  const handleScanRequestHandled = useCallback(() => setScanRequest(0), []);
+
   if (!state.profile || !targets) {
     return (
       <Onboarding
@@ -80,10 +86,6 @@ export default function App() {
     setTab("day");
     setScanRequest((value) => value + 1);
   }
-
-  // Дневник гасит флаг сразу после обработки — иначе добавление открывалось бы
-  // само при каждом возврате на вкладку «Дневник».
-  const handleScanRequestHandled = useCallback(() => setScanRequest(0), []);
 
   return (
     <div className="mx-auto min-h-dvh max-w-lg px-4 pt-[max(1rem,env(safe-area-inset-top))]">
