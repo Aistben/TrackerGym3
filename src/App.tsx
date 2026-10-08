@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { usePersistentState } from "./lib/storage";
-import { computeTargets, today } from "./lib/nutrition";
+import { computeTargets, currentWeight, today } from "./lib/nutrition";
 import Onboarding from "./components/Onboarding";
 import DayView from "./components/DayView";
 import Progress from "./components/Progress";
@@ -58,18 +58,11 @@ export default function App() {
   const [date, setDate] = useState(today());
   const [scanRequest, setScanRequest] = useState(0);
 
-  const currentWeight = useMemo(() => {
-    if (!state.profile) return 0;
-    const last = [...state.weights]
-      .filter((item) => item.date <= today())
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .at(-1);
-    return last?.weight ?? state.profile.startWeight;
-  }, [state.weights, state.profile]);
+  const weight = useMemo(() => (state.profile ? currentWeight(state.profile, state.weights) : 0), [state.profile, state.weights]);
 
   const targets = useMemo(
-    () => (state.profile ? computeTargets(state.profile, currentWeight) : null),
-    [state.profile, currentWeight],
+    () => (state.profile ? computeTargets(state.profile, weight) : null),
+    [state.profile, weight],
   );
 
   if (!state.profile || !targets) {
@@ -106,10 +99,10 @@ export default function App() {
         />
       )}
       {tab === "progress" && (
-        <Progress state={state} setState={setState} targets={targets} currentWeight={currentWeight} />
+        <Progress state={state} setState={setState} targets={targets} currentWeight={weight} />
       )}
       {tab === "profile" && (
-        <ProfileView state={state} setState={setState} targets={targets} currentWeight={currentWeight} />
+        <ProfileView state={state} setState={setState} targets={targets} currentWeight={weight} />
       )}
 
       {tab === "day" && (

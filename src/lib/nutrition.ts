@@ -26,28 +26,76 @@ function clamp(value: number, min: number, max: number) {
   return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : min;
 }
 
+/** Шаг кнопок «−/+» рядом с БЖУ в настройках. */
+export const MACRO_STEP: Record<keyof Macros, number> = { protein: 10, fat: 5, carbs: 100 };
+
+/** Больше 1000 г любого макроса в день — уже опечатка, а не норма. */
+export const MACRO_LIMIT = 1000;
+
+/**
+ * Значение БЖУ после кнопки «−/+» или ручного ввода: целое число в границах
+ * 0…1000. Нечисловой ввод (пустое поле, буквы) превращается в 0, а не в NaN —
+ * иначе норма калорий ломалась бы целиком.
+ */
+export function stepMacro(value: number, delta = 0): number {
+  return clamp(Math.round((Number.isFinite(value) ? value : 0) + delta), 0, MACRO_LIMIT);
+}
+
+/** БЖУ, которые человек задал в настройках руками (или null, если их нет). */
+function manualMacros(value?: Partial<Macros> | null): Macros | null {
+  if (!value) return null;
+  const { protein, fat, carbs } = value;
+  if (![protein, fat, carbs].every((item) => typeof item === "number" && Number.isFinite(item))) return null;
+  return { protein: stepMacro(protein!), fat: stepMacro(fat!), carbs: stepMacro(carbs!) };
+}
+
+/**
+ * БЖУ по формуле — для нового профиля, пока норму не задали руками:
+ * белок 1,8–2,2 г/кг, жиры 30% калорий TDEE, углеводы — остаток калорий.
+ */
+function formulaMacros(profile: Profile, weight: number, tdee: number): Macros {
+  const protein = Math.round(weight * (profile.goal === "lose" ? 2.2 : 1.8));
+  const fat = Math.round((tdee * 0.3) / 9);
+  const carbs = Math.max(0, Math.round((tdee - protein * 4 - fat * 9) / 4));
+  return { protein, fat, carbs };
+}
+
+/**
+ * Норма на день. Калории всегда получаются из БЖУ (белки и углеводы по
+ * 4 ккал/г, жиры по 9 ккал/г): если человек задал БЖУ в настройках, берём их,
+ * иначе считаем БЖУ по формуле. Темп и ручная корректировка убраны —
+ * «тонкая настройка» теперь и есть ручной ввод БЖУ.
+ */
 export function computeTargets(profile: Profile, currentWeight: number): Targets {
   const weight = clamp(currentWeight || profile.startWeight, 20, 400);
   const height = clamp(profile.height, 100, 250);
   const age = clamp(profile.age, 13, 100);
-  const pace = clamp(profile.pace || 0, 0, 1);
   const bmr = bmrMifflin({ sex: profile.sex, weight, height, age });
   const tdee = Math.round(bmr * ACTIVITY[profile.activity].k);
 
+  const macros = manualMacros(profile.macroTargets) ?? formulaMacros(profile, weight, tdee);
+  return { bmr, tdee, calories: Math.round(macroCalories(macros)), ...macros };
+}
+
+/**
+ * Прежняя норма: TDEE + темп + слайдер корректировки, а БЖУ — по формуле.
+ * Нужна только при обновлении приложения: у старых профилей норма один раз
+ * замораживается в ручные БЖУ, чтобы цифры не «прыгали» после удаления темпа.
+ * @deprecated считает по полям Profile.pace и Profile.calorieAdjust, которых больше нет в UI.
+ */
+export function legacyTargets(profile: Profile, currentWeight: number): Macros {
+  const weight = clamp(currentWeight || profile.startWeight, 20, 400);
+  const height = clamp(profile.height, 100, 250);
+  const age = clamp(profile.age, 13, 100);
+  const pace = clamp(profile.pace ?? 0, 0, 1);
+  const bmr = bmrMifflin({ sex: profile.sex, weight, height, age });
+  const tdee = Math.round(bmr * ACTIVITY[profile.activity].k);
   const sign = profile.goal === "lose" ? -1 : profile.goal === "gain" ? 1 : 0;
   const dailyDelta = sign * ((pace * KCAL_PER_KG) / 7);
   let calories = Math.round(tdee + dailyDelta + (profile.calorieAdjust || 0));
   calories = Math.max(calories, Math.round(bmr * 0.85));
-
-  // Белок: 1.8–2.2 г/кг. Жиры — 30% калорий, остаток приходится на углеводы.
-  // Более высокая доля жиров не завышает углеводы при наборе массы.
-  const proteinPerKg = profile.goal === "lose" ? 2.2 : 1.8;
-  const protein = Math.round(weight * proteinPerKg);
-  const fatPct = 0.3;
-  const fat = Math.round((calories * fatPct) / 9);
-  const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
-
-  return { bmr, tdee, calories, protein, fat, carbs };
+  const macros = formulaMacros(profile, weight, calories);
+  return macros;
 }
 
 export function entryTotals(e: MealEntry) {
@@ -80,6 +128,21 @@ export function dayTotals(meals: Meal[]) {
 
 export function macroCalories(m: Macros) {
   return m.protein * 4 + m.fat * 9 + m.carbs * 4;
+}
+
+/** Последнее взвешивание не из будущего — точка отсчёта текущего веса. */
+export function lastWeighIn(weights: WeighIn[], upto = today()) {
+  return (
+    [...weights]
+      .filter((item) => item.date <= upto)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .at(-1) ?? null
+  );
+}
+
+/** Текущий вес: последнее взвешивание, а если его нет — стартовый вес. */
+export function currentWeight(profile: Profile, weights: WeighIn[]) {
+  return lastWeighIn(weights)?.weight ?? profile.startWeight;
 }
 
 /* ---------- даты ---------- */
@@ -136,29 +199,6 @@ export function weekdayDate(iso: string) {
   return `${WD[d.getDay()]} ${d.getDate()}`;
 }
 
-/** Точка отсчёта плановой траектории веса */
-export interface WeightAnchor {
-  date: string;
-  weight: number;
-}
-
-/** Плановая траектория веса по дням.
- * Якорь — последнее взвешивание (если передано), а не старт полгода назад:
- * иначе после реальных взвешиваний и смены цели линия плана «отставала»
- * от действительности и показывала старые цифры. */
-export function planWeight(profile: Profile, iso: string, anchor?: WeightAnchor) {
-  const a = anchor && anchor.weight > 0 ? anchor : { date: profile.startDate, weight: profile.startWeight };
-  const n = daysBetween(a.date, iso);
-  const sign = profile.goal === "lose" ? -1 : profile.goal === "gain" ? 1 : 0;
-  if (!sign) return a.weight;
-  const perDay = (profile.pace / 7) * sign;
-  const w = a.weight + perDay * n;
-  // В будущее линия прижимается к текущей цели и дальше неё не уходит,
-  // назад (до якоря) — просто продлеваем ту же траекторию.
-  if (n <= 0) return w;
-  return sign < 0 ? Math.max(w, profile.targetWeight) : Math.min(w, profile.targetWeight);
-}
-
 /** Точка графика веса: одна на каждый день периода. */
 export type WeightPoint = {
   iso: string;
@@ -166,24 +206,21 @@ export type WeightPoint = {
   day: string;
   /** вес, кг — только в дни взвешиваний, иначе линия рвётся */
   факт?: number;
-  /** плановая траектория веса, кг — есть в каждой точке */
-  план: number;
 };
 
 /**
- * Данные для графика веса. Вес есть только в дни взвешиваний: пропуски
- * recharts просто не рисует, а линия плана идёт сплошной.
+ * Данные для графика веса: по точке на каждый день периода, вес — только
+ * в дни взвешиваний (пропуски recharts просто не рисует). Плана от темпа
+ * больше нет: темп убран, цель показывается линией и карточкой «Цель».
  */
 export function weightSeries({
   days,
   weights,
   profile,
-  anchor,
 }: {
   days: string[];
   weights: WeighIn[];
   profile: Profile;
-  anchor?: WeightAnchor;
 }): WeightPoint[] {
   const weightsByDate = new Map(weights.map((item) => [item.date, item.weight]));
   return days
@@ -193,15 +230,7 @@ export function weightSeries({
       date: shortDate(iso),
       day: weekdayDate(iso),
       факт: weightsByDate.get(iso),
-      план: round(planWeight(profile, iso, anchor), 1),
     }));
-}
-
-export function etaDays(profile: Profile, currentWeight: number) {
-  if (profile.goal === "maintain" || !profile.pace) return null;
-  const diff = Math.abs(profile.targetWeight - currentWeight);
-  if (diff < 0.1) return 0;
-  return Math.ceil((diff / profile.pace) * 7);
 }
 
 export function round(n: number, d = 0) {
