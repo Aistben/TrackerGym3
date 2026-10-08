@@ -60,6 +60,26 @@ test("пока БЖУ не заданы руками, работает форм�
   assert.equal(t.carbs, Math.round((t.tdee - t.protein * 4 - t.fat * 9) / 4));
 });
 
+test("нажатие «+» у углеводов: +100 г и +400 ккал к норме дня", () => {
+  const before = computeTargets(profile, 80);
+  // То же, что делает карточка настроек: берём текущие БЖУ и шагаем на шаг вверх.
+  const macros = { protein: before.protein, fat: before.fat, carbs: before.carbs };
+  const after = computeTargets({ ...profile, macroTargets: { ...macros, carbs: stepMacro(macros.carbs, MACRO_STEP.carbs) } }, 80);
+
+  assert.equal(after.carbs, before.carbs + 100);
+  assert.equal(after.protein, before.protein, "остальные макросы не трогаем");
+  assert.equal(after.fat, before.fat);
+  assert.equal(after.calories - before.calories, 400, "100 г углеводов — это 400 ккал");
+});
+
+test("цифра, вписанная руками, фиксируется как есть", () => {
+  // Поле ввода отдаёт строку — разбираем её так же, как карточка настроек.
+  const typed = (value: string) => stepMacro(Number(value.replace(",", ".")));
+  assert.equal(typed("250"), 250);
+  assert.equal(typed("187,4"), 187, "дробное значение округляется до целого грамма");
+  assert.equal(typed(""), 0, "пустое поле не ломает норму");
+});
+
 test("текущий вес берётся из последнего взвешивания, а не из будущего", () => {
   const weights = [
     { date: "2026-01-01", weight: 80 },
