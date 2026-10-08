@@ -5,14 +5,13 @@ import {
   ComposedChart,
   Legend,
   Line,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import type { AppState, Targets } from "../lib/types";
-import { GOALS, dateRange, dayTotals, daysBetween, lastWeighIn, round, shortDate, today, weightSeries } from "../lib/nutrition";
+import { GOALS, dateRange, dayTotals, daysBetween, goalShiftText, lastWeighIn, round, shortDate, today, weightSeries } from "../lib/nutrition";
 import { Btn, Empty, Field, Select, Sheet, numField } from "./ui";
 
 const RANGES = [
@@ -23,9 +22,8 @@ const RANGES = [
   { d: 365, label: "Год", hint: "12 месяцев" },
 ];
 
-/** Цвета графика: фиолетовый — факт (вес), бирюзовый пунктир — линия цели. */
+/** Цвет графика: фиолетовый — факт (вес). */
 const WEIGHT_COLOR = "#a855f7";
-const PLAN_COLOR = "#2dd4bf";
 
 export default function Progress({
   state,
@@ -45,7 +43,7 @@ export default function Progress({
 
   const days = useMemo(() => dateRange(todayDate, range), [todayDate, range]);
 
-  /** График — только вес: линия факта и линия цели. Плана от темпа больше нет. */
+  /** График — только вес. Целевого веса и плана от темпа больше нет. */
   const weightData = useMemo(
     () => weightSeries({ days, weights: state.weights, profile }),
     [days, state.weights, profile],
@@ -81,7 +79,7 @@ export default function Progress({
     <div className="space-y-4 pb-28">
       <div className="grid grid-cols-2 gap-3">
         <Stat title="Текущий вес" value={`${round(currentWeight, 1)} кг`} sub={`${delta > 0 ? "+" : ""}${delta} кг от старта`} />
-        <Stat title="Цель" value={`${profile.targetWeight} кг`} sub={GOALS[profile.goal].label} />
+        <Stat title="Цель" value={GOALS[profile.goal].label} sub={goalShiftText(profile.goal)} />
         <Stat title="Средние калории" value={avg ? `${avg}` : "—"} sub={`цель ${targets.calories} ккал`} />
         <Stat title="Средний белок" value={avgP ? `${avgP} г` : "—"} sub={`цель ${targets.protein} г`} />
       </div>
@@ -104,7 +102,7 @@ export default function Progress({
             </Btn>
           </div>
           <p className="text-[11px] text-mute">
-            Фиолетовая линия — вес, бирюзовый пунктир — линия цели. Проведи пальцем по графику, чтобы увидеть день.
+            Фиолетовая линия — вес. Проведи пальцем по графику, чтобы увидеть день.
           </p>
         </div>
 
@@ -148,7 +146,6 @@ export default function Progress({
               />
               <YAxis tick={{ fontSize: 10, fill: "#b0a2cf" }} domain={["dataMin - 1.5", "dataMax + 1.5"]} />
               <Tooltip contentStyle={tipStyle} labelStyle={{ color: "#b0a2cf" }} />
-              <ReferenceLine y={profile.targetWeight} stroke={PLAN_COLOR} strokeDasharray="4 4" />
               <Area
                 type="monotone"
                 dataKey="факт"

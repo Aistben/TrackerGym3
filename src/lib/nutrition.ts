@@ -8,11 +8,28 @@ export const ACTIVITY: Record<ActivityKey, { label: string; hint: string; k: num
   athlete: { label: "Очень высокая", hint: "2 раза в день / физический труд", k: 1.9 },
 };
 
-export const GOALS: Record<Goal, { label: string; emoji: string; desc: string }> = {
-  lose: { label: "Похудение", emoji: "🔥", desc: "дефицит калорий, сохраняем мышцы" },
-  maintain: { label: "Поддержание", emoji: "⚖️", desc: "держим текущий вес и форму" },
-  gain: { label: "Набор массы", emoji: "🍚", desc: "профицит калорий, растим массу" },
+/**
+ * Цель задаёт базовую норму, пока БЖУ не заданы руками:
+ * shift — сдвиг калорий от TDEE (−0,2 = на 20% ниже расхода),
+ * proteinPerKg — белок, г на кг текущего веса.
+ */
+export const GOALS: Record<Goal, { label: string; emoji: string; desc: string; shift: number; proteinPerKg: number }> = {
+  lose: { label: "Похудение", emoji: "🔥", desc: "дефицит калорий, сохраняем мышцы", shift: -0.2, proteinPerKg: 2.2 },
+  maintain: { label: "Поддержание", emoji: "⚖️", desc: "держим текущий вес и форму", shift: 0, proteinPerKg: 1.8 },
+  gain: { label: "Набор массы", emoji: "🍚", desc: "профицит калорий, растим массу", shift: 0.1, proteinPerKg: 1.8 },
 };
+
+/** Цель из сохранённых данных: всё непонятное считаем поддержанием, а не роняем приложение. */
+export function normalizeGoal(value: unknown): Goal {
+  return typeof value === "string" && (Object.keys(GOALS) as string[]).includes(value) ? (value as Goal) : "maintain";
+}
+
+/** Подпись сдвига нормы для карточек и подсказок: «−20% от TDEE», «на уровне TDEE». */
+export function goalShiftText(goal: Goal): string {
+  const pct = Math.round(GOALS[normalizeGoal(goal)].shift * 100);
+  if (pct === 0) return "на уровне TDEE";
+  return `${pct > 0 ? "+" : "−"}${Math.abs(pct)}% от TDEE`;
+}
 
 /** ~7700 ккал в 1 кг массы тела */
 export const KCAL_PER_KG = 7700;
@@ -50,21 +67,28 @@ function manualMacros(value?: Partial<Macros> | null): Macros | null {
 }
 
 /**
- * БЖУ по формуле — для нового профиля, пока норму не задали руками:
- * белок 1,8–2,2 г/кг, жиры 30% калорий TDEE, углеводы — остаток калорий.
+ * БЖУ по формуле, пока норму не задали руками: белок — г на кг по цели,
+ * жиры — 30% калорий, углеводы — остаток калорий.
  */
-function formulaMacros(profile: Profile, weight: number, tdee: number): Macros {
-  const protein = Math.round(weight * (profile.goal === "lose" ? 2.2 : 1.8));
-  const fat = Math.round((tdee * 0.3) / 9);
-  const carbs = Math.max(0, Math.round((tdee - protein * 4 - fat * 9) / 4));
+function formulaMacros(goal: Goal, weight: number, calories: number): Macros {
+  const protein = Math.round(weight * GOALS[goal].proteinPerKg);
+  const fat = Math.round((calories * 0.3) / 9);
+  const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
   return { protein, fat, carbs };
 }
 
 /**
- * Норма на день. Калории всегда получаются из БЖУ (белки и углеводы по
- * 4 ккал/г, жиры по 9 ккал/г): если человек задал БЖУ в настройках, берём их,
- * иначе считаем БЖУ по формуле. Темп и ручная корректировка убраны —
- * «тонкая настройка» теперь и есть ручной ввод БЖУ.
+ * Калории по цели: TDEE со сдвигом цели (похудение −20%, набор +10%), но не
+ * ниже BMR — ниже базового обмена норму не опускаем.
+ */
+function goalCalories(goal: Goal, bmr: number, tdee: number): number {
+  return Math.max(Math.round(tdee * (1 + GOALS[normalizeGoal(goal)].shift)), bmr);
+}
+
+/**
+ * Норма на день. Базовая норма — от цели: калории по цели, БЖУ по формуле.
+ * Если человек задал БЖУ руками, они важнее цели. Калории всегда получаются
+ * из БЖУ (белки и углеводы по 4 ккал/г, жиры по 9 ккал/г).
  */
 export function computeTargets(profile: Profile, currentWeight: number): Targets {
   const weight = clamp(currentWeight || profile.startWeight, 20, 400);
@@ -72,8 +96,9 @@ export function computeTargets(profile: Profile, currentWeight: number): Targets
   const age = clamp(profile.age, 13, 100);
   const bmr = bmrMifflin({ sex: profile.sex, weight, height, age });
   const tdee = Math.round(bmr * ACTIVITY[profile.activity].k);
+  const goal = normalizeGoal(profile.goal);
 
-  const macros = manualMacros(profile.macroTargets) ?? formulaMacros(profile, weight, tdee);
+  const macros = manualMacros(profile.macroTargets) ?? formulaMacros(goal, weight, goalCalories(goal, bmr, tdee));
   return { bmr, tdee, calories: Math.round(macroCalories(macros)), ...macros };
 }
 
@@ -94,7 +119,7 @@ export function legacyTargets(profile: Profile, currentWeight: number): Macros {
   const dailyDelta = sign * ((pace * KCAL_PER_KG) / 7);
   let calories = Math.round(tdee + dailyDelta + (profile.calorieAdjust || 0));
   calories = Math.max(calories, Math.round(bmr * 0.85));
-  const macros = formulaMacros(profile, weight, calories);
+  const macros = formulaMacros(normalizeGoal(profile.goal), weight, calories);
   return macros;
 }
 
@@ -211,7 +236,7 @@ export type WeightPoint = {
 /**
  * Данные для графика веса: по точке на каждый день периода, вес — только
  * в дни взвешиваний (пропуски recharts просто не рисует). Плана от темпа
- * больше нет: темп убран, цель показывается линией и карточкой «Цель».
+ * больше нет: темп убран, цель видна карточкой «Цель» и нормой на день.
  */
 export function weightSeries({
   days,

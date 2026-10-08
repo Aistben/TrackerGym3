@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { ActivityKey, Goal, Profile, Sex } from "../lib/types";
-import { ACTIVITY, GOALS, computeTargets, today } from "../lib/nutrition";
+import { ACTIVITY, GOALS, computeTargets, goalShiftText, today } from "../lib/nutrition";
 import { Btn, Field } from "./ui";
 
 export default function Onboarding({ onDone }: { onDone: (p: Profile) => void }) {
@@ -10,7 +10,6 @@ export default function Onboarding({ onDone }: { onDone: (p: Profile) => void })
   const [age, setAge] = useState("25");
   const [height, setHeight] = useState("178");
   const [weight, setWeight] = useState("80");
-  const [target, setTarget] = useState("75");
   const [activity, setActivity] = useState<ActivityKey>("moderate");
 
   const profile: Profile = useMemo(
@@ -20,13 +19,12 @@ export default function Onboarding({ onDone }: { onDone: (p: Profile) => void })
       age: +age || 25,
       height: +height || 175,
       startWeight: +weight || 75,
-      targetWeight: +target || +weight || 75,
       activity,
       goal,
       startDate: today(),
       profileSettingsLocked: true,
     }),
-    [sex, age, height, weight, target, activity, goal],
+    [sex, age, height, weight, activity, goal],
   );
 
   const t = computeTargets(profile, profile.startWeight);
@@ -45,10 +43,7 @@ export default function Onboarding({ onDone }: { onDone: (p: Profile) => void })
           {(Object.keys(GOALS) as Goal[]).map((g) => (
             <button
               key={g}
-              onClick={() => {
-                setGoal(g);
-                if (g === "maintain") setTarget(weight);
-              }}
+              onClick={() => setGoal(g)}
               className={`flex w-full items-center gap-4 rounded-2xl border p-4 text-left transition active:scale-[0.98] ${
                 goal === g ? "border-acc bg-acc/10" : "border-line bg-panel hover:border-acc2/40"
               }`}
@@ -56,7 +51,9 @@ export default function Onboarding({ onDone }: { onDone: (p: Profile) => void })
               <span className="shrink-0 text-3xl">{GOALS[g].emoji}</span>
               <span className="min-w-0">
                 <span className="block font-semibold leading-tight">{GOALS[g].label}</span>
-                <span className="mt-1 block text-xs leading-relaxed text-mute">{GOALS[g].desc}</span>
+                <span className="mt-1 block text-xs leading-relaxed text-mute">
+                  {GOALS[g].desc}. База: {goalShiftText(g)}.
+                </span>
               </span>
             </button>
           ))}
@@ -85,30 +82,20 @@ export default function Onboarding({ onDone }: { onDone: (p: Profile) => void })
             <Field label="Рост, см">
               <input className="field" inputMode="numeric" type="number" min={100} max={250} value={height} onChange={(e) => setHeight(e.target.value)} />
             </Field>
-            <Field label="Текущий вес, кг">
-              <input
-                className="field"
-                inputMode="decimal"
-                type="number"
-                min={20}
-                max={400}
-                step="0.1"
-                value={weight}
-                onChange={(e) => setWeight(e.target.value.replace(",", "."))}
-              />
-            </Field>
-            <Field label="Целевой вес, кг">
-              <input
-                className="field"
-                inputMode="decimal"
-                type="number"
-                min={20}
-                max={400}
-                step="0.1"
-                value={target}
-                onChange={(e) => setTarget(e.target.value.replace(",", "."))}
-              />
-            </Field>
+            <div className="col-span-2">
+              <Field label="Текущий вес, кг">
+                <input
+                  className="field"
+                  inputMode="decimal"
+                  type="number"
+                  min={20}
+                  max={400}
+                  step="0.1"
+                  value={weight}
+                  onChange={(e) => setWeight(e.target.value.replace(",", "."))}
+                />
+              </Field>
+            </div>
           </div>
         </div>
       )}
