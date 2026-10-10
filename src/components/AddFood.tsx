@@ -50,10 +50,6 @@ export default function AddFood({
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState<Product | null>(null);
-  const [correctionSearchOpen, setCorrectionSearchOpen] = useState(false);
-  const [correctionQuery, setCorrectionQuery] = useState("");
-  const [correctionProducts, setCorrectionProducts] = useState<Product[]>([]);
-  const [correctionLoading, setCorrectionLoading] = useState(false);
   const [refreshingBarcode, setRefreshingBarcode] = useState(false);
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
   const [draft, setDraft] = useState({ ...blankDraft });
@@ -123,49 +119,11 @@ export default function AddFood({
     };
   }, [q, mode, lib, products]);
 
-  // Отдельный интернет-поиск из карточки порции: если штрихкод совпал с
-  // неправильной записью, можно найти продукт по точному названию с упаковки.
-  useEffect(() => {
-    const query = correctionQuery.trim();
-    if (!correctionSearchOpen || mode !== "portion" || query.length < 2) {
-      setCorrectionProducts([]);
-      setCorrectionLoading(false);
-      return;
-    }
-
-    const controller = new AbortController();
-    const timer = window.setTimeout(async () => {
-      setCorrectionLoading(true);
-      try {
-        const found = await searchOnline(query, controller.signal);
-        if (!controller.signal.aborted) setCorrectionProducts(found);
-      } catch {
-        if (!controller.signal.aborted) setCorrectionProducts([]);
-      } finally {
-        if (!controller.signal.aborted) setCorrectionLoading(false);
-      }
-    }, 400);
-
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [correctionQuery, correctionSearchOpen, mode]);
-
   function pick(p: Product, persist = false) {
     if (persist) onSaveProduct(p);
     setPicked(p);
     setGrams(String(p.portion ?? 100));
     setMode("portion");
-  }
-
-  function pickCorrection(p: Product) {
-    // Сохраняем интернет-карточку и заменяем запись с тем же штрихкодом.
-    onSaveProduct(p);
-    setPicked(p);
-    setCorrectionSearchOpen(false);
-    setCorrectionProducts([]);
-    setNotice(`«${p.name}» загружен из Open Food Facts и сохранён в базу.`);
   }
 
   /**
@@ -374,56 +332,14 @@ export default function AddFood({
           </Btn>
         )}
 
-        <div className="rounded-xl border border-line bg-panel2/50 p-2.5">
-          <Btn
-            variant="soft"
-            size="sm"
-            className="w-full"
-            onClick={() => {
-              setCorrectionSearchOpen((open) => !open);
-              setCorrectionProducts([]);
-              setCorrectionQuery("");
-              setNotice(null);
-            }}
-          >
-            {correctionSearchOpen ? "Скрыть поиск" : "❌ Не тот продукт? Найти по названию"}
-          </Btn>
-          {correctionSearchOpen && (
-            <div className="mt-2 space-y-2">
-              <p className="text-[11px] leading-snug text-mute">
-                Введи название соуса и бренд с упаковки. Найденную карточку можно сразу сохранить в свою базу.
-              </p>
-              <input
-                className="field compact"
-                {...noSuggest}
-                autoFocus
-                placeholder="Например: томатный соус, бренд"
-                value={correctionQuery}
-                onChange={(e) => setCorrectionQuery(e.target.value)}
-              />
-              {correctionLoading && <div className="py-1 text-center text-xs text-mute">Ищем в Open Food Facts…</div>}
-              {!correctionLoading && correctionQuery.trim().length >= 2 && !correctionProducts.length && (
-                <div className="py-1 text-center text-xs text-mute">Ничего не нашлось. Проверь название или попробуй короче.</div>
-              )}
-              {correctionProducts.length > 0 && (
-                <div className="max-h-56 space-y-1.5 overflow-y-auto overscroll-contain">
-                  {correctionProducts.map((p) => (
-                    <Row key={p.id} p={p} online onClick={() => pickCorrection(p)} />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
         <div className="flex items-center gap-1.5">
           <button
             type="button"
             aria-label="Минус 10 грамм"
             onClick={() => setGrams(String(Math.max(0, (+grams || 0) - 10)))}
-            className="grid size-9 shrink-0 place-items-center rounded-xl border border-line bg-panel2 text-base leading-none font-bold transition active:scale-95"
+            className="grid size-9 shrink-0 place-items-center rounded-xl border border-line bg-panel2 text-[11px] leading-none font-bold transition active:scale-95"
           >
-            <span className="leading-none">−</span>
+            <span className="leading-none">−10</span>
           </button>
           <div className="relative min-w-0 flex-1">
             <input
@@ -438,25 +354,26 @@ export default function AddFood({
             type="button"
             aria-label="Плюс 10 грамм"
             onClick={() => setGrams(String((+grams || 0) + 10))}
-            className="grid size-9 shrink-0 place-items-center rounded-xl border border-line bg-panel2 text-base leading-none font-bold transition active:scale-95"
+            className="grid size-9 shrink-0 place-items-center rounded-xl border border-line bg-panel2 text-[11px] leading-none font-bold transition active:scale-95"
           >
-            <span className="leading-none">+</span>
+            <span className="leading-none">+10</span>
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-1.5">
-          {[50, 100, 150, 200].map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setGrams(String(v))}
-              className={`rounded-lg border py-2 text-sm font-semibold whitespace-nowrap transition active:scale-95 ${
-                +grams === v ? "border-acc bg-acc/20 text-acc" : "border-line bg-panel2 hover:border-acc2/60"
-              }`}
-            >
-              {v} г
-            </button>
-          ))}
+        <div className="space-y-1">
+          <div className="text-[11px] text-mute">Быстро изменить количество</div>
+          <div className="grid grid-cols-4 gap-1">
+            {[50, 100, 150, 200, -200, -100, -50].map((change) => (
+              <button
+                key={change}
+                type="button"
+                onClick={() => setGrams(String(Math.max(0, (+grams || 0) + change)))}
+                className="rounded-lg border border-line bg-panel2 px-1 py-1.5 text-xs font-semibold whitespace-nowrap transition hover:border-acc2/60 active:scale-95"
+              >
+                {change > 0 ? `+${change}` : change} г
+              </button>
+            ))}
+          </div>
         </div>
         {picked.portion && (
           <button

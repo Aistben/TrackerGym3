@@ -32,20 +32,14 @@ export default function DayView({
   targets,
   date,
   setDate,
-  scanRequest,
-  onScanRequestHandled,
 }: {
   state: AppState;
   setState: React.Dispatch<React.SetStateAction<AppState>>;
   targets: Targets;
   date: string;
   setDate: (d: string) => void;
-  /** счётчик: кнопка «Сканировать» на главном экране поднимает его на 1 */
-  scanRequest: number;
-  onScanRequestHandled: () => void;
 }) {
   const [addTo, setAddTo] = useState<Meal | null>(null);
-  const [addMode, setAddMode] = useState<"search" | "scan">("search");
   const [newMeal, setNewMeal] = useState(false);
   const [timePick, setTimePick] = useState<Meal | null>(null);
   const [editEntry, setEditEntry] = useState<EntryAction | null>(null);
@@ -73,7 +67,6 @@ export default function DayView({
   const [preview, setPreview] = useState<{ mealId: string; entryId: string; grams: number } | null>(null);
   /** Открытая свайпом строка продукта: id и сторона */
   const [swiped, setSwiped] = useState<{ id: string; side: SwipeSide } | null>(null);
-  const [tempMealId, setTempMealId] = useState<string | null>(null);
   const [draftPreview, setDraftPreview] = useState<{ product: Product; grams: number } | null>(null);
   const [addStep, setAddStep] = useState<"search" | "scan" | "form" | "portion">("search");
   const noticeTimer = useRef<number | null>(null);
@@ -177,45 +170,20 @@ export default function DayView({
     };
   }, []);
 
-  // Плавающая кнопка сразу включает сканер. Создаём временный приём на сегодня
-  // и на время нажатия; при отмене пустая карточка удаляется, после добавления
-  // продукта она остаётся в дневнике.
-  useEffect(() => {
-    if (!scanRequest) return;
-    onScanRequestHandled();
-    startQuickScan();
-  }, [scanRequest, onScanRequestHandled]);
-
   function addMeal(title: string, time: string, day = date): Meal {
     const meal = { id: uid(), date: day, title: title.trim(), time, entries: [] };
     update((ms) => [...ms, meal]);
     return meal;
   }
 
-  function startQuickScan() {
-    const scanDate = today();
-    const meal = addMeal("", nowTime(), scanDate);
-    setDate(scanDate);
-    setTempMealId(meal.id);
-    setAddMode("scan");
-    setAddTo(meal);
-  }
-
   function addEntry(mealId: string, e: MealEntry) {
-    setTempMealId(null);
     update((ms) => ms.map((m) => (m.id === mealId ? { ...m, entries: [...m.entries, e] } : m)));
   }
 
   function closeAddFood() {
     setDraftPreview(null);
     setAddStep("search");
-    const temporaryId = tempMealId;
-    if (temporaryId) {
-      update((ms) => ms.filter((meal) => meal.id !== temporaryId || meal.entries.length > 0));
-      setTempMealId(null);
-    }
     setAddTo(null);
-    setAddMode("search");
   }
 
   function removeEntry(mealId: string, entryId: string) {
@@ -467,8 +435,11 @@ export default function DayView({
             }`}
           >
             <div className="border-b border-line px-3 py-2.5">
-              {/* Верхняя строка: время у левого края, название рядом, «⋮» справа. */}
-              <div className="flex items-center gap-1.5">
+              {meal.title?.trim() && meal.title.trim() !== "Приём" && (
+                <div className="mb-1.5 break-words text-sm leading-snug font-semibold">{meal.title.trim()}</div>
+              )}
+              {/* В одной строке: время, БЖУ, калории и меню справа. */}
+              <div className="flex min-w-0 items-center gap-1.5 text-[10px] leading-snug font-semibold">
                 <button
                   type="button"
                   onClick={() => setTimePick(meal)}
@@ -477,30 +448,21 @@ export default function DayView({
                 >
                   {meal.time}
                 </button>
-                <div className="min-w-0 flex-1">
-                  {meal.title?.trim() && meal.title.trim() !== "Приём" && (
-                    <div className="break-words text-sm leading-snug font-semibold">{meal.title.trim()}</div>
-                  )}
+                <div className="flex shrink-0 flex-nowrap items-center gap-x-1">
+                  <span className="whitespace-nowrap text-acc2">Б {round(t.protein)}</span>
+                  <span className="whitespace-nowrap text-warn">· Ж {round(t.fat)}</span>
+                  <span className="whitespace-nowrap text-acc">· У {round(t.carbs)}</span>
                 </div>
-                {/* Одна кнопка «⋮» вместо трёх значков: дублирование и удаление
-                    приёма живут в меню действий, копирования всей карточки на
-                    завтра здесь больше нет. */}
-                <IconBtn onClick={() => setMealMenu(meal)} title="Действия с приёмом" size={28}>
-                  <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <div className="shrink-0 text-[10px] font-semibold whitespace-nowrap text-ink">
+                  {round(t.kcal)} ккал
+                </div>
+                <IconBtn onClick={() => setMealMenu(meal)} title="Действия с приёмом" size={32} className="ml-auto">
+                  <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                     <circle cx="12" cy="5" r="1.75" />
                     <circle cx="12" cy="12" r="1.75" />
                     <circle cx="12" cy="19" r="1.75" />
                   </svg>
                 </IconBtn>
-              </div>
-              {/* Нижняя строка: БЖУ под временем у левого края, калории — у правого. */}
-              <div className="mt-1.5 flex min-w-0 items-center justify-between gap-2 text-[10px] leading-snug font-semibold">
-                <div className="flex min-w-0 flex-wrap items-center gap-x-1">
-                  <span className="whitespace-nowrap text-acc2">Б {round(t.protein)}</span>
-                  <span className="whitespace-nowrap text-warn">· Ж {round(t.fat)}</span>
-                  <span className="whitespace-nowrap text-acc">· У {round(t.carbs)}</span>
-                </div>
-                <span className="shrink-0 whitespace-nowrap text-ink">{round(t.kcal)} ккал</span>
               </div>
             </div>
 
@@ -534,10 +496,7 @@ export default function DayView({
 
             <button
               type="button"
-              onClick={() => {
-                setAddMode("search");
-                setAddTo(meal);
-              }}
+              onClick={() => setAddTo(meal)}
               className="w-full border-t border-line py-2.5 text-sm font-semibold text-acc transition hover:bg-acc/5 active:bg-acc/10"
             >
               + Добавить продукт
@@ -565,18 +524,18 @@ export default function DayView({
                 : "Добавить продукт"
         }
         placement="bottom"
-        compact={false}
+        compact={addStep === "portion"}
+        wide={addStep === "portion"}
         solid
         noBackdrop
-        full
+        full={addStep !== "portion"}
       >
         {addTo && (
           <AddFood
-            key={addTo.id + addMode}
+            key={addTo.id}
             products={state.products}
             recentProductIds={state.recentProductIds}
             mealTitle={mealTitle(addTo.title)}
-            startMode={addMode}
             onSaveProduct={(p: Product) =>
               setState((s) => ({
                 ...s,
@@ -818,7 +777,7 @@ export default function DayView({
       </Sheet>
 
       {/* Корзина дня: продукты, перенесённые на этот день свайпом. Появляется
-          только когда в ней что-то есть; кнопка — над «Сканировать». */}
+          только когда в ней что-то есть; кнопка закреплена над нижней навигацией. */}
       {basketItems.length > 0 && (
         <button
           type="button"
@@ -831,7 +790,7 @@ export default function DayView({
           }`}
           style={{
             right: "max(1rem, calc((100vw - 32rem) / 2 + 1rem))",
-            bottom: "calc(5.75rem + var(--safe-bottom) + 3.75rem)",
+            bottom: "calc(5.75rem + var(--safe-bottom))",
           }}
         >
           🧺
@@ -847,7 +806,7 @@ export default function DayView({
           className="fixed z-[46] overflow-hidden rounded-2xl border border-line shadow-2xl shadow-black/70"
           style={{
             right: "max(1rem, calc((100vw - 32rem) / 2 + 1rem))",
-            bottom: "calc(5.75rem + var(--safe-bottom) + 6.5rem)",
+            bottom: "calc(5.75rem + var(--safe-bottom) + 2.75rem)",
             width: "min(21rem, calc(100vw - 2rem))",
             background: "#241a40",
             // На время переноса прячем панель: палец должен «видеть» все карточки
@@ -946,7 +905,7 @@ function EntryEditor({
     setGrams(text);
     onPreview(numeric);
   };
-  const quickValues = [50, 100, 150, 200, 250, 300];
+  const gramIncrements = [50, 100, 150, 200, 250, 300];
 
   return (
     <div className="space-y-2.5">
@@ -973,19 +932,20 @@ function EntryEditor({
           </IconBtn>
         </div>
       </Field>
-      <div className="grid grid-cols-2 gap-1.5">
-        {quickValues.map((quick) => (
-          <button
-            type="button"
-            key={quick}
-            onClick={() => changeGrams(quick)}
-            className={`rounded-lg border py-2 text-sm font-semibold whitespace-nowrap transition active:scale-95 ${
-              value === quick ? "border-acc bg-acc/20 text-acc" : "border-line bg-panel2 hover:border-acc2/60"
-            }`}
-          >
-            {quick} г
-          </button>
-        ))}
+      <div className="space-y-1">
+        <div className="text-[11px] text-mute">Добавить к текущему количеству</div>
+        <div className="grid grid-cols-2 gap-1.5">
+          {gramIncrements.map((increment) => (
+            <button
+              type="button"
+              key={increment}
+              onClick={() => changeGrams(value + increment)}
+              className="rounded-lg border border-line bg-panel2 py-2 text-sm font-semibold whitespace-nowrap transition hover:border-acc2/60 active:scale-95"
+            >
+              +{increment} г
+            </button>
+          ))}
+        </div>
       </div>
       <div className="flex gap-2">
         <Btn variant="soft" className="flex-1" onClick={onCancel}>
@@ -1230,13 +1190,11 @@ function EntryRow({
               <span className="whitespace-nowrap font-semibold text-acc2">· Б {round(totals.protein, 1)}</span>
               <span className="whitespace-nowrap font-semibold text-warn">· Ж {round(totals.fat, 1)}</span>
               <span className="whitespace-nowrap font-semibold text-acc">· У {round(totals.carbs, 1)}</span>
+              {/* Калории этой порции идут сразу после углеводов, как в строке приёма. */}
+              <span className="ml-1 shrink-0 text-[10px] font-semibold whitespace-nowrap text-ink">
+                {round(totals.kcal)} ккал
+              </span>
             </div>
-          </div>
-          {/* Справа — калории именно этой порции (граммовка × ккал на 100 г).
-              Подпись «ккал» рядом с числом: без неё цифру легко принять
-              за граммы или за ккал на 100 г. */}
-          <div className="shrink-0 text-xs font-semibold whitespace-nowrap">
-            {round(totals.kcal)} <span className="text-[10px] font-medium text-mute">ккал</span>
           </div>
         </button>
       </div>
@@ -1420,7 +1378,10 @@ function TimePicker({
       />
       <div>
         <div className="relative grid grid-cols-2 gap-2 overflow-hidden rounded-2xl border border-line bg-panel2/60 p-1.5">
-          <div className="pointer-events-none absolute inset-x-2 top-1/2 z-10 h-10 -translate-y-1/2 rounded-xl border border-acc/40 bg-acc/10" />
+          <div
+            className="pointer-events-none absolute inset-x-2 z-10 h-10 -translate-y-1/2 rounded-xl border border-acc/40 bg-acc/10"
+            style={{ top: "calc(50% + 8px)" }}
+          />
           <Wheel label="Часы" values={hours} value={selectedHour} onChange={setSelectedHour} scrollRef={hourRef} />
           <Wheel label="Минуты" values={minutes} value={selectedMinute} onChange={setSelectedMinute} scrollRef={minuteRef} />
         </div>
@@ -1526,7 +1487,10 @@ function NewMealForm({ onCreate }: { onCreate: (title: string, time: string) => 
 
       {pickerOpen && (
         <div className="rise relative grid w-full grid-cols-2 gap-2 overflow-hidden rounded-2xl border border-line bg-panel2/60 p-1.5">
-          <div className="pointer-events-none absolute inset-x-2 top-1/2 z-10 h-10 -translate-y-1/2 rounded-xl border border-acc/40 bg-acc/15" />
+          <div
+            className="pointer-events-none absolute inset-x-2 z-10 h-10 -translate-y-1/2 rounded-xl border border-acc/40 bg-acc/15"
+            style={{ top: "calc(50% + 8px)" }}
+          />
           <Wheel label="Часы" values={hours} value={hour} onChange={setHour} scrollRef={hourRef} />
           <Wheel label="Минуты" values={minutes} value={minute} onChange={setMinute} scrollRef={minuteRef} />
         </div>
