@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { usePersistentState } from "./lib/storage";
 import { computeTargets, currentWeight, today } from "./lib/nutrition";
 import Onboarding from "./components/Onboarding";
@@ -28,15 +28,6 @@ function IconProgress({ active }: { active: boolean }) {
   );
 }
 
-function IconScan({ active }: { active: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth={active ? 2.3 : 1.9} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 7V5.5A1.5 1.5 0 0 1 5.5 4H7M17 4h1.5A1.5 1.5 0 0 1 20 5.5V7M20 17v1.5a1.5 1.5 0 0 1-1.5 1.5H17M7 20H5.5A1.5 1.5 0 0 1 4 18.5V17" />
-      <path d="M8 8v8M11 8v8M14.5 8v8M17 8v8" />
-    </svg>
-  );
-}
-
 function IconProfile({ active }: { active: boolean }) {
   return (
     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth={active ? 2.3 : 1.9} strokeLinecap="round" strokeLinejoin="round">
@@ -56,7 +47,6 @@ export default function App() {
   const [state, setState] = usePersistentState();
   const [tab, setTab] = useState<Tab>("day");
   const [date, setDate] = useState(today());
-  const [scanRequest, setScanRequest] = useState(0);
 
   const weight = useMemo(() => (state.profile ? currentWeight(state.profile, state.weights) : 0), [state.profile, state.weights]);
 
@@ -65,6 +55,8 @@ export default function App() {
     [state.profile, weight],
   );
 
+  // Все хуки вызываются до раннего возврата на онбординг, чтобы не менять
+  // их порядок после появления профиля.
   if (!state.profile || !targets) {
     return (
       <Onboarding
@@ -75,16 +67,6 @@ export default function App() {
     );
   }
 
-  /** Открыть сканер напрямую: дневник создаст временный приём на сегодня и текущее время. */
-  function openBarcodeScanner() {
-    setTab("day");
-    setScanRequest((value) => value + 1);
-  }
-
-  // Дневник гасит флаг сразу после обработки — иначе добавление открывалось бы
-  // само при каждом возврате на вкладку «Дневник».
-  const handleScanRequestHandled = useCallback(() => setScanRequest(0), []);
-
   return (
     <div className="mx-auto min-h-dvh max-w-lg px-4 pt-[max(1rem,env(safe-area-inset-top))]">
       {tab === "day" && (
@@ -94,8 +76,6 @@ export default function App() {
           targets={targets}
           date={date}
           setDate={setDate}
-          scanRequest={scanRequest}
-          onScanRequestHandled={handleScanRequestHandled}
         />
       )}
       {tab === "progress" && (
@@ -105,25 +85,11 @@ export default function App() {
         <ProfileView state={state} setState={setState} targets={targets} currentWeight={weight} />
       )}
 
-      {tab === "day" && (
-        <button
-          type="button"
-          aria-label="Сканировать штрихкод"
-          title="Сканировать штрихкод"
-          onClick={openBarcodeScanner}
-          className="fixed z-[45] flex items-center gap-2 rounded-full border border-white/25 bg-acc py-3 pr-4 pl-3.5 text-white shadow-xl shadow-acc/30 transition hover:scale-105 hover:brightness-105 active:scale-95"
-          style={{
-            right: "max(1rem, calc((100vw - 32rem) / 2 + 1rem))",
-            bottom: "calc(5.75rem + var(--safe-bottom))",
-          }}
-        >
-          <IconScan active />
-          <span className="text-[13px] leading-none font-semibold whitespace-nowrap">Сканировать</span>
-        </button>
-      )}
-
-      <nav data-bottom-nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#18102c]">
-        <div className="mx-auto flex max-w-lg px-2 py-1.5">
+      <nav
+        data-bottom-nav
+        className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-violet-300/10 bg-[#130c24]/95 shadow-[0_-8px_24px_rgba(10,4,22,0.4)] backdrop-blur-xl"
+      >
+        <div className="mx-auto flex max-w-lg gap-2 px-3 py-2">
           {TABS.map((t) => {
             const isActive = tab === t.key;
             const Icon = t.icon;
@@ -132,16 +98,23 @@ export default function App() {
                 type="button"
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className="relative flex flex-1 flex-col items-center gap-1 rounded-xl py-1.5 text-[11px] transition"
+                className={`relative flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-[11px] transition-all duration-200 active:scale-[0.97] ${
+                  isActive
+                    ? "bg-gradient-to-br from-violet-400/20 via-purple-500/15 to-fuchsia-500/10 text-violet-100 shadow-md shadow-violet-500/20 ring-1 ring-violet-200/25"
+                    : "text-mute hover:bg-white/5 hover:text-white"
+                }`}
               >
                 <span
-                  className={`grid h-9 w-14 place-items-center rounded-full transition ${
-                    isActive ? "bg-acc/25 text-acc shadow-sm shadow-acc/30 ring-1 ring-acc/40" : "text-mute/90"
+                  className={`grid h-8 w-12 place-items-center rounded-xl transition-all duration-200 ${
+                    isActive ? "bg-violet-300/15 text-violet-100 drop-shadow-[0_0_8px_rgba(216,180,254,.55)]" : "text-mute/80"
                   }`}
                 >
                   <Icon active={isActive} />
                 </span>
-                <span className={isActive ? "font-semibold text-acc" : "font-medium text-mute"}>{t.label}</span>
+                <span className={isActive ? "font-semibold text-violet-100" : "font-medium text-mute"}>{t.label}</span>
+                {isActive && (
+                  <span className="absolute top-1.5 size-1 rounded-full bg-fuchsia-200 shadow-[0_0_8px_rgba(232,121,249,.9)]" />
+                )}
               </button>
             );
           })}

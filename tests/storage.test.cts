@@ -98,6 +98,15 @@ test("битые значения БЖУ в профиле игнорируют�
   assert.deepEqual(loadState().profile?.macroTargets, { protein: 160, fat: 70, carbs: 0 });
 });
 
+test("целевой вес убран из профиля, а неизвестная цель становится поддержанием", () => {
+  withStorage({ ...emptyState, profile: { ...profile, goal: "bulk" } });
+  const state = loadState();
+  assert.ok(state.profile);
+  assert.equal(state.profile.targetWeight, undefined, "целевой вес остался в профиле");
+  assert.equal(state.profile.goal, "maintain");
+  assert.ok(computeTargets(state.profile, 80).calories > 0);
+});
+
 test("заметки сохраняются по дням и очищаются от некорректных записей", () => {
   withStorage({
     ...emptyState,

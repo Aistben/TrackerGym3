@@ -9,8 +9,10 @@ export interface Profile {
   age: number;
   height: number; // см
   startWeight: number; // кг
-  targetWeight: number; // кг
+  /** @deprecated Целевой вес убран из настроек: норму задаёт цель. Оставлен для старых бэкапов. */
+  targetWeight?: number; // кг
   activity: ActivityKey;
+  /** Цель задаёт базовую норму (калории от TDEE и белок), пока БЖУ не заданы руками. */
   goal: Goal;
   startDate: string; // YYYY-MM-DD
   /** Общий замок цели, параметров тела и нормы калорий в профиле. */

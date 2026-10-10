@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { MACRO_STEP, computeTargets, currentWeight, lastWeighIn, stepMacro } from "../src/lib/nutrition";
+import { MACRO_STEP, computeTargets, currentWeight, goalShiftText, lastWeighIn, stepMacro } from "../src/lib/nutrition";
 import type { Profile } from "../src/lib/types";
 
 const profile: Profile = {
@@ -50,14 +50,48 @@ test("ручные БЖУ важнее изменения веса и актив
   assert.equal(computeTargets(manual, 95).calories, 160 * 4 + 70 * 9 + 250 * 4);
 });
 
-test("пока БЖУ не заданы руками, работает формула: белок по весу, калории по TDEE", () => {
-  const t = computeTargets(profile, 80);
-  assert.equal(t.protein, 176, "при похудении белок 2,2 г/кг");
-  // Темпа и корректировки больше нет: норма это TDEE, округлённый через БЖУ
-  // (±1–2 ккал — округление граммов, а не отдельная надбавка).
-  assert.ok(Math.abs(t.calories - t.tdee) <= 3, `норма ${t.calories} должна быть около TDEE ${t.tdee}`);
-  assert.equal(t.fat, Math.round((t.tdee * 0.3) / 9));
-  assert.equal(t.carbs, Math.round((t.tdee - t.protein * 4 - t.fat * 9) / 4));
+test("пока БЖУ не заданы руками, норма считается от цели: похудение −20%, набор +10%, поддержание — TDEE", () => {
+  const lose = computeTargets({ ...profile, goal: "lose" }, 80);
+  const maintain = computeTargets({ ...profile, goal: "maintain" }, 80);
+  const gain = computeTargets({ ...profile, goal: "gain" }, 80);
+
+  // Граммы БЖУ округляются целыми, поэтому допуск ±3 ккал.
+  assert.ok(Math.abs(lose.calories - lose.tdee * 0.8) <= 3, `похудение: норма ${lose.calories} при TDEE ${lose.tdee}`);
+  assert.ok(Math.abs(maintain.calories - maintain.tdee) <= 3, `поддержание: норма ${maintain.calories} при TDEE ${maintain.tdee}`);
+  assert.ok(Math.abs(gain.calories - gain.tdee * 1.1) <= 3, `набор: норма ${gain.calories} при TDEE ${gain.tdee}`);
+  assert.ok(lose.calories < maintain.calories && maintain.calories < gain.calories, "цель должна реально менять норму");
+});
+
+test("белок по цели: при похудении 2,2 г на кг, при поддержании и наборе — 1,8", () => {
+  assert.equal(computeTargets({ ...profile, goal: "lose" }, 80).protein, 176);
+  assert.equal(computeTargets({ ...profile, goal: "maintain" }, 80).protein, 144);
+  assert.equal(computeTargets({ ...profile, goal: "gain" }, 80).protein, 144);
+});
+
+test("жиры — 30% калорий цели, углеводы — остаток калорий до цели", () => {
+  const t = computeTargets({ ...profile, goal: "gain" }, 80);
+  const target = Math.round(t.tdee * 1.1); // норма набора массы
+  assert.equal(t.fat, Math.round((target * 0.3) / 9));
+  assert.equal(t.carbs, Math.round((target - t.protein * 4 - t.fat * 9) / 4));
+});
+
+test("при похудении норма не опускается ниже BMR", () => {
+  // Малоподвижный образ жизни: TDEE = 1,2 × BMR, а минус 20% дал бы меньше базового обмена.
+  const t = computeTargets({ ...profile, activity: "sedentary", goal: "lose" }, 80);
+  assert.equal(t.bmr, 1780);
+  assert.ok(Math.abs(t.calories - t.bmr) <= 3, `норма ${t.calories} должна быть около BMR ${t.bmr}`);
+});
+
+test("ручные БЖУ важнее цели: смена цели их не меняет", () => {
+  const manual = { ...profile, macroTargets: { protein: 160, fat: 70, carbs: 250 } };
+  assert.equal(computeTargets({ ...manual, goal: "lose" }, 80).calories, 160 * 4 + 70 * 9 + 250 * 4);
+  assert.equal(computeTargets({ ...manual, goal: "gain" }, 80).calories, 160 * 4 + 70 * 9 + 250 * 4);
+});
+
+test("подпись цели показывает сдвиг нормы от TDEE", () => {
+  assert.equal(goalShiftText("lose"), "−20% от TDEE");
+  assert.equal(goalShiftText("maintain"), "на уровне TDEE");
+  assert.equal(goalShiftText("gain"), "+10% от TDEE");
 });
 
 test("нажатие «+» у углеводов: +100 г и +400 ккал к норме дня", () => {

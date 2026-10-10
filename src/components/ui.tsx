@@ -10,6 +10,7 @@ export function Sheet({
   full,
   center = false,
   compact = false,
+  wide = false,
   noBackdrop = false,
   solid = false,
   closeButtonClassName,
@@ -22,6 +23,8 @@ export function Sheet({
   full?: boolean;
   center?: boolean;
   compact?: boolean;
+  /** широкая компактная шторка — по ширине основного содержимого */
+  wide?: boolean;
   noBackdrop?: boolean;
   /** непрозрачный фон — карточки под шторкой не просвечивают */
   solid?: boolean;
@@ -43,7 +46,13 @@ export function Sheet({
   return (
     <div
       className={`fixed inset-0 z-50 flex justify-center ${
-        full ? "items-stretch p-0 sm:items-center sm:p-4" : placement === "center" ? "items-center p-4" : "items-end p-3 pb-[calc(4.5rem+var(--safe-bottom))]"
+        full
+          ? "items-stretch p-0 sm:items-center sm:p-4"
+          : placement === "center"
+            ? "items-center p-4"
+            : wide
+              ? "items-end p-4 pb-[calc(6rem+var(--safe-bottom))]"
+              : "items-end p-3 pb-[calc(4.5rem+var(--safe-bottom))]"
       }`}
     >
       {/* Без тёмной подложки (noBackdrop) слой всё равно перехватывает клики —
@@ -58,7 +67,7 @@ export function Sheet({
         className={`sheet-in relative w-full overflow-hidden border-line ${solid ? "backdrop-blur-none" : "bg-panel"} shadow-2xl shadow-black/60 ${
           full
             ? "h-[100dvh] max-h-none max-w-lg rounded-none border-0 sm:h-[92vh] sm:max-h-[92vh] sm:rounded-3xl sm:border"
-            : `${compact ? "max-w-sm" : "max-w-lg"} border ${
+            : `${wide ? "max-w-[30rem]" : compact ? "max-w-sm" : "max-w-lg"} border ${
                 placement === "center"
                   ? `${compact ? "max-h-[72vh]" : "max-h-[88vh]"} rounded-3xl`
                   : compact

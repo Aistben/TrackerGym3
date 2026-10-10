@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { AppState, DayNote, Profile, WeighIn } from "./types";
 import { SEED_PRODUCTS } from "./seed";
 import { pruneBasket, sanitizeBasket } from "./basket";
-import { currentWeight, legacyTargets, stepMacro, today } from "./nutrition";
+import { currentWeight, legacyTargets, normalizeGoal, stepMacro, today } from "./nutrition";
 
 const KEY = "nutri-tracker-v1";
 
@@ -38,6 +38,7 @@ function dropLegacyMacros(profile: Profile): Profile {
  */
 function normalizeProfile(profile: Profile, weights: WeighIn[]): Profile {
   const clean = dropLegacyMacros(profile);
+  clean.goal = normalizeGoal(clean.goal);
   const profileSettingsLocked =
     typeof clean.profileSettingsLocked === "boolean"
       ? clean.profileSettingsLocked
@@ -58,6 +59,8 @@ function normalizeProfile(profile: Profile, weights: WeighIn[]): Profile {
   delete clean.pace;
   delete clean.calorieAdjust;
   delete clean.calorieAdjustHistory;
+  // Целевой вес в настройках больше не нужен: норму задаёт цель, а вес — текущий.
+  delete clean.targetWeight;
   return { ...clean, profileSettingsLocked, macroTargets };
 }
 
