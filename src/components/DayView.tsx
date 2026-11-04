@@ -13,6 +13,7 @@ import type { BasketItem } from "../lib/types";
 import { sameBarcode } from "../lib/barcode";
 import { calculate, formatCalculatorResult, type CalculatorOperator } from "../lib/calculator";
 import { buildDayRationText } from "../lib/dayText";
+import { buildPeriodText, monthLabel, monthRange } from "../lib/periodText";
 import { copyText } from "../lib/clipboard";
 import { Bar, Btn, Empty, Field, IconBtn, Ring, Sheet, noSuggest, numField } from "./ui";
 import AddFood from "./AddFood";
@@ -1251,7 +1252,11 @@ function CalendarView({
   const monthIndex = first.getMonth();
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
   const leading = (first.getDay() + 6) % 7;
-  const monthLabel = first.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+  const range = monthRange(month);
+  const monthLabelText = first.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+  /** Копирование всего месяца: день за днём со всем, что введено. */
+  const [withProducts, setWithProducts] = useState(true);
+  const [copyNote, setCopyNote] = useState<string | null>(null);
   const totals = useMemo(() => {
     const result = new Map<string, ReturnType<typeof sumTotals>>();
     for (const meal of state.meals) {
@@ -1268,16 +1273,30 @@ function CalendarView({
     return result;
   }, [state.meals]);
 
+  async function copyMonth() {
+    const text = buildPeriodText({
+      from: range.from,
+      to: range.to,
+      meals: state.meals,
+      targets,
+      name: state.profile?.name,
+      includeProducts: withProducts,
+    });
+    const done = await copyText(text);
+    setCopyNote(done ? "Скопировано — можно вставлять" : "Не получилось скопировать");
+  }
+
   function moveMonth(delta: number) {
     const next = new Date(year, monthIndex + delta, 1, 12);
     setMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-01`);
+    setCopyNote(null);
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <IconBtn onClick={() => moveMonth(-1)} title="Предыдущий месяц" size={36}>‹</IconBtn>
-        <div className="text-center font-semibold capitalize">{monthLabel}</div>
+        <div className="text-center font-semibold capitalize">{monthLabelText}</div>
         <IconBtn onClick={() => moveMonth(1)} title="Следующий месяц" size={36}>›</IconBtn>
       </div>
       <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-semibold text-mute">
@@ -1313,12 +1332,35 @@ function CalendarView({
           );
         })}
       </div>
+      {/* Кнопка выгрузки: календарь остаётся как был, добавляется только копирование месяца. */}
+      <div className="rounded-2xl border border-line bg-panel2/40 p-3" data-no-swipe>
+        <Btn className="w-full" onClick={copyMonth}>
+          <span className="truncate">📋 Скопировать за {monthLabel(month)}</span>
+        </Btn>
+        <label className="mt-2 flex items-center justify-center gap-2 text-[11px] text-mute">
+          <input
+            type="checkbox"
+            className="size-4 accent-[var(--color-acc)]"
+            checked={withProducts}
+            onChange={(event) => setWithProducts(event.target.checked)}
+          />
+          С продуктами и граммовками
+        </label>
+        {copyNote ? (
+          <p className="mt-2 text-center text-[11px] font-semibold text-acc2">✓ {copyNote}</p>
+        ) : (
+          <p className="mt-2 text-center text-[10px] leading-snug text-mute">
+            В тексте — каждый день месяца с днём недели, датой, съеденным и БЖУ, итог и среднее за месяц.
+          </p>
+        )}
+      </div>
       <div className="grid grid-cols-1 gap-1.5 text-[10px] text-mute min-[360px]:grid-cols-3 min-[360px]:gap-2">
         <div className="rounded-lg bg-acc2/12 px-2 py-1.5 text-center"><span className="text-acc2">●</span> цель выполнена</div>
         <div className="rounded-lg bg-bad/10 px-2 py-1.5 text-center"><span className="text-bad">●</span> ниже или выше нормы</div>
         <div className="rounded-lg bg-panel2/55 px-2 py-1.5 text-center"><span>●</span> нет записей</div>
       </div>
       <p className="text-center text-[11px] text-mute">Зелёный день — калории и все БЖУ в пределах ±10% от цели.</p>
+
     </div>
   );
 }
