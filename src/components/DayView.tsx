@@ -13,16 +13,7 @@ import type { BasketItem } from "../lib/types";
 import { sameBarcode } from "../lib/barcode";
 import { calculate, formatCalculatorResult, type CalculatorOperator } from "../lib/calculator";
 import { buildDayRationText } from "../lib/dayText";
-import {
-  buildPeriodText,
-  monthLabel,
-  monthRange,
-  monthShortLabel,
-  periodDays,
-  shiftMonth,
-  summarizePeriod,
-  weekRange,
-} from "../lib/periodText";
+import { buildPeriodText, monthLabel, monthRange } from "../lib/periodText";
 import { copyText } from "../lib/clipboard";
 import { Bar, Btn, Empty, Field, IconBtn, Ring, Sheet, noSuggest, numField } from "./ui";
 import AddFood from "./AddFood";
@@ -1244,13 +1235,6 @@ function EntryMoveSheet({
   );
 }
 
-/** «42350» → «42 350»: итоги за месяц читаются, а не слипаются. */
-function grouped(value: number) {
-  return String(round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-}
-
-const WEEKDAYS_SHORT = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
-
 function CalendarView({
   state,
   targets,
@@ -1268,7 +1252,11 @@ function CalendarView({
   const monthIndex = first.getMonth();
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
   const leading = (first.getDay() + 6) % 7;
+  const range = monthRange(month);
   const monthLabelText = first.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+  /** Копирование всего месяца: день за днём со всем, что введено. */
+  const [withProducts, setWithProducts] = useState(true);
+  const [copyNote, setCopyNote] = useState<string | null>(null);
   const totals = useMemo(() => {
     const result = new Map<string, ReturnType<typeof sumTotals>>();
     for (const meal of state.meals) {
@@ -1285,30 +1273,7 @@ function CalendarView({
     return result;
   }, [state.meals]);
 
-  /** Что копируем: неделя выбранного дня, открытый месяц или месяц перед ним. */
-  const [periodChoice, setPeriodChoice] = useState<"week" | "month" | "prevMonth">("month");
-  /** В выгрузку добавить приёмы пищи и продукты, а не только БЖУ за день. */
-  const [withProducts, setWithProducts] = useState(false);
-  const [copyNote, setCopyNote] = useState<string | null>(null);
-
-  const prevMonthKey = shiftMonth(month, -1);
-  const periodChoices = useMemo(
-    () =>
-      [
-        { key: "week" as const, label: "Неделя" },
-        { key: "month" as const, label: monthShortLabel(month) },
-        { key: "prevMonth" as const, label: monthShortLabel(prevMonthKey) },
-      ] as const,
-    [month, prevMonthKey],
-  );
-
-  const chosenRange =
-    periodChoice === "week"
-      ? weekRange(selectedDate)
-      : monthRange(periodChoice === "prevMonth" ? prevMonthKey : month);
-  const chosenLabel = periodChoice === "week" ? "неделю" : periodChoice === "prevMonth" ? `за ${monthLabel(prevMonthKey)}` : `за ${monthLabel(month)}`;
-
-  async function copyRange(range: { from: string; to: string }) {
+  async function copyMonth() {
     const text = buildPeriodText({
       from: range.from,
       to: range.to,
@@ -1324,6 +1289,7 @@ function CalendarView({
   function moveMonth(delta: number) {
     const next = new Date(year, monthIndex + delta, 1, 12);
     setMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-01`);
+    setCopyNote(null);
   }
 
   return (
@@ -1366,6 +1332,28 @@ function CalendarView({
           );
         })}
       </div>
+      {/* Кнопка выгрузки: календарь остаётся как был, добавляется только копирование месяца. */}
+      <div className="rounded-2xl border border-line bg-panel2/40 p-3" data-no-swipe>
+        <Btn className="w-full" onClick={copyMonth}>
+          <span className="truncate">📋 Скопировать за {monthLabel(month)}</span>
+        </Btn>
+        <label className="mt-2 flex items-center justify-center gap-2 text-[11px] text-mute">
+          <input
+            type="checkbox"
+            className="size-4 accent-[var(--color-acc)]"
+            checked={withProducts}
+            onChange={(event) => setWithProducts(event.target.checked)}
+          />
+          С продуктами и граммовками
+        </label>
+        {copyNote ? (
+          <p className="mt-2 text-center text-[11px] font-semibold text-acc2">✓ {copyNote}</p>
+        ) : (
+          <p className="mt-2 text-center text-[10px] leading-snug text-mute">
+            В тексте — каждый день месяца с днём недели, датой, съеденным и БЖУ, итог и среднее за месяц.
+          </p>
+        )}
+      </div>
       <div className="grid grid-cols-1 gap-1.5 text-[10px] text-mute min-[360px]:grid-cols-3 min-[360px]:gap-2">
         <div className="rounded-lg bg-acc2/12 px-2 py-1.5 text-center"><span className="text-acc2">●</span> цель выполнена</div>
         <div className="rounded-lg bg-bad/10 px-2 py-1.5 text-center"><span className="text-bad">●</span> ниже или выше нормы</div>
@@ -1373,157 +1361,6 @@ function CalendarView({
       </div>
       <p className="text-center text-[11px] text-mute">Зелёный день — калории и все БЖУ в пределах ±10% от цели.</p>
 
-      {/* Выгрузка за период: день за днём с БЖУ, итог и среднее внизу текста. */}
-      <div className="rounded-2xl border border-line bg-panel2/40 p-3" data-no-swipe>
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <h4 className="text-[11px] font-semibold tracking-wide text-mute uppercase">Копировать за период</h4>
-          {copyNote && <span className="truncate text-[10px] font-semibold text-acc2">✓ {copyNote}</span>}
-        </div>
-        <div className="grid grid-cols-3 gap-1.5">
-          {periodChoices.map((choice) => (
-            <button
-              key={choice.key}
-              type="button"
-              onClick={() => {
-                setPeriodChoice(choice.key);
-                setCopyNote(null);
-              }}
-              className={`rounded-xl border px-1 py-2 text-[11px] font-semibold transition active:scale-95 ${
-                periodChoice === choice.key ? "border-acc bg-acc/20 text-ink" : "border-line bg-panel2/60 text-mute"
-              }`}
-            >
-              {choice.label}
-            </button>
-          ))}
-        </div>
-        <label className="mt-2 flex items-center gap-2 text-[11px] text-mute">
-          <input
-            type="checkbox"
-            className="size-4 accent-[var(--color-acc)]"
-            checked={withProducts}
-            onChange={(event) => setWithProducts(event.target.checked)}
-          />
-          С продуктами и приёмами пищи
-        </label>
-        <Btn size="sm" className="mt-2 w-full" onClick={() => copyRange(chosenRange)}>
-          <span className="truncate">📋 Скопировать {chosenLabel}</span>
-        </Btn>
-        <p className="mt-1.5 text-[10px] leading-snug text-mute">
-          В тексте — каждый день недели с датой и БЖУ, итог за весь период и среднее в день. Подходит, чтобы вставить в заметки или отправить тренеру.
-        </p>
-      </div>
-
-      {/* Итоги по месяцам: по умолчанию свёрнуты, чтобы таблица не занимала экран. */}
-      <div className="space-y-1.5">
-        <h4 className="text-[11px] font-semibold tracking-wide text-mute uppercase">Итоги по месяцам</h4>
-        <MonthSummary
-          monthKey={`${today().slice(0, 7)}-01`}
-          tag="текущий"
-          meals={state.meals}
-          selectedDate={selectedDate}
-          onSelect={onSelect}
-          onCopy={(range) => copyRange(range)}
-        />
-        <MonthSummary
-          monthKey={shiftMonth(`${today().slice(0, 7)}-01`, -1)}
-          tag="прошлый"
-          meals={state.meals}
-          selectedDate={selectedDate}
-          onSelect={onSelect}
-          onCopy={(range) => copyRange(range)}
-        />
-      </div>
-    </div>
-  );
-}
-
-/** Свёрнутый итог за месяц: открывается по нажатию в список дней с БЖУ. */
-function MonthSummary({
-  monthKey,
-  tag,
-  meals,
-  selectedDate,
-  onSelect,
-  onCopy,
-}: {
-  monthKey: string;
-  tag: string;
-  meals: Meal[];
-  selectedDate: string;
-  onSelect: (date: string) => void;
-  onCopy: (range: { from: string; to: string }) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const range = monthRange(monthKey);
-  const summary = useMemo(() => summarizePeriod(meals, range.from, range.to), [meals, range.from, range.to]);
-  const daysWithEntries = useMemo(
-    () => periodDays(range.from, range.to).filter((iso) => summary.byDay.has(iso)),
-    [range.from, range.to, summary],
-  );
-
-  return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-panel2/40" data-no-swipe>
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-center gap-2 px-3 py-2.5 text-left transition active:bg-panel2/70"
-        aria-expanded={open}
-      >
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <span className="truncate text-sm font-semibold capitalize">{monthLabel(monthKey)}</span>
-            <span className="shrink-0 rounded-full bg-acc/15 px-1.5 py-0.5 text-[9px] font-semibold text-acc2">{tag}</span>
-          </div>
-          {summary.daysWithEntries ? (
-            <div className="mt-0.5 truncate text-[10px] text-mute">
-              {summary.daysWithEntries} дн. · {grouped(summary.totals.kcal)} ккал · Б {grouped(summary.totals.protein)} · Ж {grouped(summary.totals.fat)} · У {grouped(summary.totals.carbs)} г
-            </div>
-          ) : (
-            <div className="mt-0.5 text-[10px] text-mute">нет записей</div>
-          )}
-        </div>
-        <span className={`shrink-0 text-xs text-mute transition ${open ? "rotate-90" : ""}`}>▸</span>
-      </button>
-
-      {open && (
-        <div className="space-y-0.5 border-t border-line px-2 py-2">
-          {daysWithEntries.length ? (
-            daysWithEntries.map((iso) => {
-              const dayTotals = summary.byDay.get(iso)!;
-              const date = new Date(`${iso}T12:00:00`);
-              return (
-                <button
-                  key={iso}
-                  type="button"
-                  onClick={() => onSelect(iso)}
-                  className={`flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11px] transition active:scale-[0.99] ${
-                    iso === selectedDate ? "bg-acc/15" : "hover:bg-panel2/70"
-                  }`}
-                >
-                  <span className="w-14 shrink-0 font-semibold text-mute">{WEEKDAYS_SHORT[date.getDay()]} {date.getDate()}</span>
-                  <span className="shrink-0 font-semibold">{grouped(dayTotals.kcal)} ккал</span>
-                  <span className="ml-auto truncate text-[10px] text-mute">Б {grouped(dayTotals.protein)} · Ж {grouped(dayTotals.fat)} · У {grouped(dayTotals.carbs)} г</span>
-                </button>
-              );
-            })
-          ) : (
-            <p className="px-2 py-1.5 text-[11px] text-mute">За этот месяц записей пока нет.</p>
-          )}
-          <div className="flex min-w-0 items-center justify-between gap-2 px-2 pt-1.5 text-[10px] text-mute">
-            <span className="truncate">
-              Дней с записями: {summary.daysWithEntries} из {summary.days}
-              {summary.daysWithEntries ? ` · в среднем ${grouped(summary.average.kcal)} ккал/день` : ""}
-            </span>
-            <button
-              type="button"
-              onClick={() => onCopy(range)}
-              className="shrink-0 rounded-lg bg-acc/15 px-2 py-1 text-[10px] font-semibold text-acc2 transition active:scale-95"
-            >
-              📋 Скопировать
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
