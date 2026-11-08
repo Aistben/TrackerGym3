@@ -2,6 +2,8 @@ import { useRef, useState } from "react";
 import type { ActivityKey, AppState, Goal, Macros, Profile, Sex, Targets } from "../lib/types";
 import { ACTIVITY, GOALS, MACRO_STEP, goalShiftText, round, stepMacro } from "../lib/nutrition";
 import { emptyState, normalizeState } from "../lib/storage";
+import { copyText } from "../lib/clipboard";
+import { buildMyProductsText, myProducts } from "../lib/productsText";
 import { Btn, Field, Select, Sheet, numField } from "./ui";
 
 /** Белок цели в читаемом виде: «2,2» — с запятой, как в остальном интерфейсе. */
@@ -24,7 +26,19 @@ export default function ProfileView({
   const [resetOpen, setResetOpen] = useState(false);
   // Смена цели при ручных БЖУ сначала спрашивает подтверждение: цель заменит их расчётом.
   const [goalPending, setGoalPending] = useState<Goal | null>(null);
+  const [productsNote, setProductsNote] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const productsNoteTimer = useRef<number | null>(null);
+
+  // Свои продукты (не встроенная база): введённые вручную + найденные онлайн.
+  const myCount = myProducts(state.products).length;
+
+  async function copyMyProducts() {
+    const done = await copyText(buildMyProductsText(state.products));
+    setProductsNote(done ? "Скопировано — можно вставлять" : "Не получилось скопировать");
+    if (productsNoteTimer.current !== null) window.clearTimeout(productsNoteTimer.current);
+    productsNoteTimer.current = window.setTimeout(() => setProductsNote(null), 2500);
+  }
 
   const patch = (d: Partial<Profile>) => setState((s) => ({ ...s, profile: { ...s.profile!, ...d } }));
 
@@ -263,6 +277,22 @@ export default function ProfileView({
             Сбросить
           </Btn>
         </div>
+        <Btn
+          variant="soft"
+          size="sm"
+          title="Скопировать текстом свои продукты с БЖУ на 100 г (встроенная база не копируется)"
+          disabled={!myCount}
+          onClick={copyMyProducts}
+          className="min-h-9 w-full whitespace-nowrap !px-1 !py-2 text-[11px] leading-none max-[360px]:text-[10px]"
+        >
+          📋 Скопировать мои продукты{myCount ? ` (${myCount})` : ""}
+        </Btn>
+        <p aria-live="polite" className={`text-xs leading-snug ${productsNote ? "text-acc" : "text-mute"}`}>
+          {productsNote ??
+            (myCount
+              ? "Текстом: название, бренд и БЖУ на 100 г — только ваши продукты (введённые вручную и найденные онлайн), без встроенной базы."
+              : "Своих продуктов пока нет: они появятся, когда добавишь продукт вручную или найдёшь по штрихкоду.")}
+        </p>
         <input
           ref={fileRef}
           type="file"
