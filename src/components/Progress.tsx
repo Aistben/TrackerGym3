@@ -14,7 +14,7 @@ import type { AppState, Targets } from "../lib/types";
 import { GOALS, dayTotals, goalShiftText, round, shortDate, today } from "../lib/nutrition";
 import { Btn, Empty, Field, Sheet, numField } from "./ui";
 
-import { progressWindow } from "../lib/progress";
+import { progressWindow, weightChartDomain } from "../lib/progress";
 import { validDate } from "../lib/validation";
 
 /** Цвет графика: фиолетовый — факт (вес). */
@@ -37,6 +37,7 @@ export default function Progress({
 
   const window = useMemo(() => progressWindow(state.weights, todayDate), [state.weights, todayDate]);
   const weightData = window.points;
+  const chartDomain = weightChartDomain(weightData, todayDate);
 
   // Match nutrition averages to the automatic graph window; no daily empty points needed.
   const logged = useMemo(() => {
@@ -77,7 +78,7 @@ export default function Progress({
             </Btn>
           </div>
           <p className="text-[11px] text-mute">
-            {shortDate(window.start)} — {shortDate(window.end)}. Пять месяцев, период обновляется автоматически. Проведи пальцем по графику, чтобы увидеть вес.
+            {weightData.length > 0 ? `${shortDate(weightData[0].iso)} — ${shortDate(weightData.at(-1)!.iso)}. ` : ""}Взвешивания за последние пять месяцев. Период обновляется автоматически.
           </p>
         </div>
 
@@ -93,25 +94,28 @@ export default function Progress({
           <Empty icon="⚖️" text="Добавь первое взвешивание — график начнёт строиться" />
         ) : (
           <ResponsiveContainer width="100%" height={190}>
-            <ComposedChart data={weightData} margin={{ top: 5, right: 10, left: -18, bottom: 0 }}>
+            <ComposedChart data={weightData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="gw" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={WEIGHT_COLOR} stopOpacity={0.35} />
+                  <stop offset="0%" stopColor={WEIGHT_COLOR} stopOpacity={0.2} />
                   <stop offset="100%" stopColor={WEIGHT_COLOR} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="#3b2d60" vertical={false} />
+              <CartesianGrid stroke="#343647" vertical={false} />
               <XAxis
                 dataKey="timestamp"
                 type="number"
                 scale="time"
-                domain={[Date.parse(`${window.start}T12:00:00`), Date.parse(`${window.end}T12:00:00`)]}
+                domain={chartDomain}
+                padding={{ left: 4, right: 4 }}
+                allowDataOverflow
+                tickMargin={8}
                 tickFormatter={(value) => shortDate(new Date(value).toISOString().slice(0, 10))}
                 tick={{ fontSize: 10, fill: "#b0a2cf" }}
                 tickCount={4}
                 minTickGap={24}
               />
-              <YAxis tick={{ fontSize: 10, fill: "#b0a2cf" }} domain={["dataMin - 1.5", "dataMax + 1.5"]} />
+              <YAxis width={40} tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#b0a2cf" }} domain={["dataMin - 1.5", "dataMax + 1.5"]} />
               <Tooltip contentStyle={tipStyle} labelStyle={{ color: "#b0a2cf" }} labelFormatter={(value) => new Date(Number(value)).toLocaleDateString("ru-RU")} />
               <Area
                 type="monotone"
@@ -174,7 +178,7 @@ function Stat({ title, value, sub }: { title: string; value: string; sub: string
   return (
     <div className="card p-3">
       <div className="truncate text-[11px] text-mute">{title}</div>
-      <div className="truncate text-xl font-bold">{value}</div>
+      <div className="truncate text-base font-semibold">{value}</div>
       <div className="truncate text-[11px] text-mute">{sub}</div>
     </div>
   );

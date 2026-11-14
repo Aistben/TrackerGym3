@@ -1,11 +1,11 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink: #f1ebff;
-  --color-panel: rgb(38 27 62 / .78);
-  --color-panel2: rgb(58 43 92 / .62);
-  --color-line: #4c3b77;
-  --color-mute: #b0a2cf;
+  --color-ink: #eeedf5;
+  --color-panel: rgb(32 31 47 / .94);
+  --color-panel2: rgb(48 45 65 / .70);
+  --color-line: #454155;
+  --color-mute: #b5b1c5;
   --color-acc: #a855f7;
   --color-acc2: #2dd4bf;
   --color-warn: #f2a93c;
@@ -15,17 +15,17 @@
 html, body, #root { min-height: 100%; }
 /* Фон под документом: если WebView (например, приложение с домашнего экрана на
    iPhone) оставит под вьюпортом полоску, она будет цвета приложения, а не белой. */
-html { background-color: #150f26; }
+html { background-color: #14141f; }
 body {
   margin: 0;
-  background-color: #150f26;
+  background-color: #14141f;
   background-image:
-    linear-gradient(180deg, rgb(26 16 48 / .92), rgb(15 10 30 / .96)),
+    linear-gradient(180deg, rgb(29 27 43 / .97), rgb(18 19 29 / .99)),
     url("./assets/lumen-light-bg.jpg");
   background-position: center top;
   background-size: cover, cover;
   background-attachment: fixed;
-  color: #f1ebff;
+  color: var(--color-ink);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
@@ -41,17 +41,17 @@ input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-i
 ::-webkit-scrollbar-thumb { background: #5a4689; border-radius: 99px; }
 
 @utility card {
-  background: linear-gradient(145deg, rgb(56 40 92 / .78), rgb(34 24 58 / .72));
+  background: linear-gradient(145deg, rgb(40 37 55 / .96), rgb(29 28 42 / .94));
   border: 1px solid rgb(255 255 255 / .10);
-  border-radius: 1.35rem;
-  box-shadow: 0 16px 38px rgb(8 4 20 / .45), inset 0 1px 0 rgb(255 255 255 / .09);
-  backdrop-filter: blur(18px) saturate(135%);
+  border-radius: 1.15rem;
+  box-shadow: 0 6px 20px rgb(8 8 16 / .20), inset 0 1px 0 rgb(255 255 255 / .025);
+  backdrop-filter: blur(12px);
 }
 @utility field {
-  width: 100%; background: rgb(18 12 34 / .55); border: 1px solid var(--color-line); border-radius: .9rem;
+  width: 100%; background: rgb(19 19 30 / .70); border: 1px solid var(--color-line); border-radius: .9rem;
   padding: .75rem .9rem; outline: none; transition: border-color .15s, box-shadow .15s, background .15s;
 }
-.field:focus { background: rgb(18 12 34 / .8); border-color: var(--color-acc2); box-shadow: 0 0 0 3px rgb(45 212 191 / .18); }
+.field:focus { background: rgb(19 19 30 / .9); border-color: var(--color-acc2); box-shadow: 0 0 0 3px rgb(45 212 191 / .18); }
 .field::placeholder { color: rgb(176 162 207 / .65); }
 /* Компактный вариант поля — для мобильных форм продукта / порции */
 .field.compact { padding: .55rem .75rem; font-size: .9rem; border-radius: .7rem; }
@@ -96,3 +96,13 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
   .profile-parameters { grid-template-columns: 1fr; }
   .profile-parameters > label { grid-template-columns: 1fr 1fr; grid-template-rows: 2.75rem; align-items: center; }
 }
+
+/* Compact goal tiles: icon and label have separate tracks, never overlapping. */
+.profile-goals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .375rem; }
+.profile-goal { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .4rem; min-height: 4.5rem; padding: .65rem .125rem; border: 1px solid var(--color-line); border-radius: .85rem; background: rgb(48 45 65 / .35); color: var(--color-mute); transition: background .15s, border-color .15s; }
+.profile-goal.is-selected { border-color: rgb(168 85 247 / .65); background: rgb(168 85 247 / .09); color: var(--color-ink); }
+.profile-goal:hover { border-color: rgb(168 85 247 / .65); }
+.profile-goal-icon { font-size: 1.2rem; line-height: 1.4rem; }
+.profile-goal-label { white-space: nowrap; overflow-wrap: normal; font-size: clamp(.625rem, 2.8vw, .75rem); line-height: 1rem; }
+.profile-data-action { white-space: nowrap; overflow-wrap: normal; font-size: clamp(.625rem, 2.8vw, .75rem); }
+@media (prefers-reduced-motion: reduce) { .rise, .sheet-in { animation: none; } }

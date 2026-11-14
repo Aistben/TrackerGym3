@@ -35,3 +35,12 @@ test("ручной режим явно подписан и имеет возвр
   assert.ok(html.includes("По цели"));
   assert.ok(html.includes("БЖУ фиксированы"));
 });
+
+test("цели содержат прежние значки и отдельные подписи без смешивания текста", () => {
+  const html = render(profile);
+  assert.equal((html.match(/class="profile-goal-icon"/g) ?? []).length, 3);
+  assert.equal((html.match(/class="profile-goal-label"/g) ?? []).length, 3);
+  for (const icon of ["🔥", "⚖️", "🍚"]) assert.ok(html.includes(icon));
+  for (const label of ["Похудение", "Поддержание", "Набор массы"]) assert.ok(html.includes(label));
+  assert.ok(html.includes('class="profile-goal is-selected"'));
+});

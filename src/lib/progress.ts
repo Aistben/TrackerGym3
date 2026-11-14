@@ -28,3 +28,11 @@ export function progressWindow(weights: WeighIn[], today: string) {
   }));
   return { start, end, points, historical: end !== today };
 }
+
+/** Fit the axis to real measurements, not the empty part of the retention window. */
+export function weightChartDomain(points: { timestamp: number }[], fallbackDate: string): [number, number] {
+  const first = points[0]?.timestamp ?? Date.parse(`${fallbackDate}T12:00:00`);
+  const last = points.at(-1)?.timestamp ?? first;
+  // A single measurement stays at the left; a nonzero domain keeps the chart valid.
+  return [first, last > first ? last : first + 86_400_000];
+}
