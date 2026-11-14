@@ -95,7 +95,7 @@ export function computeTargets(profile: Profile, currentWeight: number): Targets
   const height = clamp(profile.height, 100, 250);
   const age = clamp(profile.age, 13, 100);
   const bmr = bmrMifflin({ sex: profile.sex, weight, height, age });
-  const tdee = Math.round(bmr * ACTIVITY[profile.activity].k);
+  const tdee = Math.round(bmr * (ACTIVITY[profile.activity] ?? ACTIVITY.sedentary).k);
   const goal = normalizeGoal(profile.goal);
 
   const macros = manualMacros(profile.macroTargets) ?? formulaMacros(goal, weight, goalCalories(goal, bmr, tdee));
@@ -114,7 +114,7 @@ export function legacyTargets(profile: Profile, currentWeight: number): Macros {
   const age = clamp(profile.age, 13, 100);
   const pace = clamp(profile.pace ?? 0, 0, 1);
   const bmr = bmrMifflin({ sex: profile.sex, weight, height, age });
-  const tdee = Math.round(bmr * ACTIVITY[profile.activity].k);
+  const tdee = Math.round(bmr * (ACTIVITY[profile.activity] ?? ACTIVITY.sedentary).k);
   const sign = profile.goal === "lose" ? -1 : profile.goal === "gain" ? 1 : 0;
   const dailyDelta = sign * ((pace * KCAL_PER_KG) / 7);
   let calories = Math.round(tdee + dailyDelta + (profile.calorieAdjust || 0));

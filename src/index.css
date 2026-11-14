@@ -84,3 +84,15 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
 @media (min-width: 640px) {
   body { background-size: cover, 100% auto; }
 }
+
+/* Profile: short single-line labels and identical input tracks at mobile widths. */
+.profile-parameters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; align-items: start; }
+.profile-parameters > label { display: grid; grid-template-rows: minmax(1.25rem, auto) 2.75rem; gap: .35rem; }
+.profile-parameters > label > span { font-size: .75rem; color: var(--color-mute); line-height: 1.25rem; white-space: nowrap; overflow-wrap: normal; }
+.profile-parameters small { font-size: .65rem; opacity: .8; }
+.profile-parameters .field.compact { height: 2.75rem; padding: .5rem; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+.profile-view summary::marker { color: var(--color-mute); }
+@media (max-width: 300px) {
+  .profile-parameters { grid-template-columns: 1fr; }
+  .profile-parameters > label { grid-template-columns: 1fr 1fr; grid-template-rows: 2.75rem; align-items: center; }
+}

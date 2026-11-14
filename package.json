@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:pages": "vite build && node scripts/sync-pages.mjs",
+    "build:pages": "vite build --mode pages && node scripts/sync-pages.mjs",
     "preview": "vite preview",
     "test": "tsx --test tests/*.test.cts",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "check": "npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
     "@zxing/browser": "^0.2.1",
@@ -32,7 +33,10 @@
     "tailwindcss": "4.1.17",
     "tsx": "^4.23.15",
     "typescript": "5.9.3",
-    "vite": "7.2.4",
+    "vite": "7.3.8",
     "vite-plugin-singlefile": "2.3.0"
+  },
+  "engines": {
+    "node": ">=24 <25"
   }
 }

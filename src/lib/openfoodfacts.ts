@@ -80,6 +80,7 @@ export async function fetchJsonResult(url: string, externalSignal?: AbortSignal,
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const abort = () => controller.abort();
+  if (externalSignal?.aborted) controller.abort();
   externalSignal?.addEventListener("abort", abort, { once: true });
   try {
     const res = await fetch(url, { signal: controller.signal, headers: { Accept: "application/json" } });
@@ -150,6 +151,8 @@ export function lookupVariants(barcode: string): string[] {
 
 /** Ищем товар по штрихкоду в Open Food Facts (параллельно по двум доменам). */
 export async function lookupBarcodeResult(barcode: string, timeoutMs = 7000): Promise<BarcodeLookup> {
+  // Two sequential phases share one budget, rather than each consuming it.
+  const phaseTimeout = Math.max(1, timeoutMs / 2);
   const norm = normalizeGtin(barcode);
   const variants = lookupVariants(barcode);
   if (!variants.length) return { status: "not-found", product: null };
@@ -165,7 +168,7 @@ export async function lookupBarcodeResult(barcode: string, timeoutMs = 7000): Pr
   let weak: Product | null = null;
   const attempts = API_HOSTS.flatMap((host) =>
     variants.map((code) =>
-      fetchOne(host, code, markAnswered, timeoutMs)
+      fetchOne(host, code, markAnswered, phaseTimeout)
         .catch(() => null)
         .then((product) => {
           if (product && hasNutrition(product)) return product;
@@ -180,7 +183,7 @@ export async function lookupBarcodeResult(barcode: string, timeoutMs = 7000): Pr
   // Некоторые карточки индексируются поиском раньше, чем появляются в product API.
   const searches = await Promise.all(
     API_HOSTS.map((host) =>
-      fetchJsonResult(`${host}/api/v2/search?code=${encodeURIComponent(norm)}&page_size=5&fields=${FIELDS}`, undefined, timeoutMs).then(({ reached, data }) => {
+      fetchJsonResult(`${host}/api/v2/search?code=${encodeURIComponent(norm)}&page_size=5&fields=${FIELDS}`, undefined, phaseTimeout).then(({ reached, data }) => {
         if (reached) answered = true;
         return data;
       }),
