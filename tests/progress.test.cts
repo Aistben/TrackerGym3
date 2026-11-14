@@ -122,3 +122,22 @@ test("давняя запись видна без ручной настройк�
   assert.equal(fiveMonthsBefore("2026-07-31"), "2026-02-28");
   assert.equal(fiveMonthsBefore("2024-07-31"), "2024-02-29");
 });
+
+test("ось графика начинается с первого реального взвешивания, без пустых месяцев слева", async () => {
+  const { progressWindow, weightChartDomain } = await import("../src/lib/progress");
+  const window = progressWindow([
+    { date: "2026-10-01", weight: 82 },
+    { date: "2026-11-01", weight: 80 },
+  ], "2026-11-14");
+  const domain = weightChartDomain(window.points, "2026-11-14");
+  assert.equal(domain[0], window.points[0].timestamp);
+  assert.equal(domain[1], window.points[1].timestamp);
+  assert.notEqual(domain[0], Date.parse(`${window.start}T12:00:00`));
+});
+
+test("одно взвешивание остаётся слева, пустой график имеет корректный домен", async () => {
+  const { weightChartDomain } = await import("../src/lib/progress");
+  const timestamp = Date.parse("2026-11-14T12:00:00");
+  assert.deepEqual(weightChartDomain([{ timestamp }], "2026-11-14"), [timestamp, timestamp + 86_400_000]);
+  assert.deepEqual(weightChartDomain([], "2026-11-14"), [timestamp, timestamp + 86_400_000]);
+});

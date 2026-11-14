@@ -178,15 +178,16 @@ export default function ProfileView({
 
           <section className="card space-y-3 p-4" aria-labelledby="goal-title">
             <h2 id="goal-title" className="text-sm font-semibold">Цель питания</h2>
-            <div className="grid grid-cols-3 gap-2" role="group" aria-label="Цель питания">
+            <div className="profile-goals" role="group" aria-label="Цель питания">
               {(Object.keys(GOALS) as Goal[]).map((g) => (
                 <button key={g} type="button" aria-pressed={p.goal === g} onClick={() => chooseGoal(g)}
-                  className={`flex min-h-14 items-center justify-center rounded-xl border px-1 py-2 text-center text-xs leading-snug transition ${p.goal === g ? "border-acc/60 bg-acc/10 text-ink" : "border-line bg-panel2/40 text-mute"}`}>
-                  {GOALS[g].label}
+                  className={`profile-goal ${p.goal === g ? "is-selected" : ""}`}>
+                  <span className="profile-goal-icon" aria-hidden="true">{GOALS[g].emoji}</span>
+                  <span className="profile-goal-label">{GOALS[g].label}</span>
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-mute">{goalShiftText(p.goal)} · белок {proteinPerKgText(p.goal)} г/кг</p>
+            <p className="text-[11px] leading-relaxed text-mute">{goalShiftText(p.goal)} · белок {proteinPerKgText(p.goal)} г/кг</p>
           </section>
         </>
       )}
@@ -197,8 +198,8 @@ export default function ProfileView({
           <p className="mt-1 text-[11px] text-mute">Хранятся на этом устройстве</p>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <Btn variant="soft" size="sm" className="min-h-11" title="Сохранить резервную копию JSON" onClick={exportData}>Сохранить копию</Btn>
-          <Btn variant="soft" size="sm" className="min-h-11" title="Загрузить резервную копию JSON" onClick={() => fileRef.current?.click()}>Загрузить копию</Btn>
+          <Btn variant="soft" size="sm" className="profile-data-action min-h-11" title="Сохранить резервную копию JSON" onClick={exportData}>Сохранить копию</Btn>
+          <Btn variant="soft" size="sm" className="profile-data-action min-h-11" title="Загрузить резервную копию JSON" onClick={() => fileRef.current?.click()}>Загрузить копию</Btn>
         </div>
         <Btn variant="ghost" size="sm" disabled={!myCount} onClick={copyMyProducts} className="min-h-11 w-full">
           Скопировать мои продукты · {myCount}

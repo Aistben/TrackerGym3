@@ -93,7 +93,7 @@ export default function App() {
 
       <nav
         data-bottom-nav
-        className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-violet-300/10 bg-[#130c24]/95 shadow-[0_-8px_24px_rgba(10,4,22,0.4)] backdrop-blur-xl"
+        className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-violet-300/10 bg-[#191823]/95 shadow-[0_-4px_16px_rgba(8,8,16,0.2)] backdrop-blur-xl"
       >
         <div className="mx-auto flex max-w-lg gap-2 px-3 py-2">
           {TABS.map((t) => {
@@ -106,20 +106,20 @@ export default function App() {
                 onClick={() => setTab(t.key)}
                 className={`relative flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-[11px] transition-all duration-200 active:scale-[0.97] ${
                   isActive
-                    ? "bg-gradient-to-br from-violet-400/20 via-purple-500/15 to-fuchsia-500/10 text-violet-100 shadow-md shadow-violet-500/20 ring-1 ring-violet-200/25"
+                    ? "bg-violet-400/10 text-violet-100 ring-1 ring-violet-200/15"
                     : "text-mute hover:bg-white/5 hover:text-white"
                 }`}
               >
                 <span
                   className={`grid h-8 w-12 place-items-center rounded-xl transition-all duration-200 ${
-                    isActive ? "bg-violet-300/15 text-violet-100 drop-shadow-[0_0_8px_rgba(216,180,254,.55)]" : "text-mute/80"
+                    isActive ? "bg-violet-300/10 text-violet-100" : "text-mute/80"
                   }`}
                 >
                   <Icon active={isActive} />
                 </span>
                 <span className={isActive ? "font-semibold text-violet-100" : "font-medium text-mute"}>{t.label}</span>
                 {isActive && (
-                  <span className="absolute top-1.5 size-1 rounded-full bg-fuchsia-200 shadow-[0_0_8px_rgba(232,121,249,.9)]" />
+                  <span className="absolute top-1.5 size-1 rounded-full bg-violet-200/70" />
                 )}
               </button>
             );
