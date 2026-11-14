@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { AppState, DayNote, Profile, WeighIn } from "./types";
 import { SEED_PRODUCTS } from "./seed";
 import { pruneBasket, sanitizeBasket } from "./basket";
+import { validDate, validEntry, validMeal, validProduct, validProfile, validWeight, record } from "./validation";
 import { currentWeight, legacyTargets, normalizeGoal, stepMacro, today } from "./nutrition";
 
 const KEY = "nutri-tracker-v1";
@@ -70,7 +71,7 @@ function normalizeNotes(value: unknown): DayNote[] {
   for (const item of value) {
     if (!item || typeof item !== "object") continue;
     const note = item as Partial<DayNote>;
-    if (typeof note.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(note.date)) continue;
+    if (!validDate(note.date)) continue;
     if (typeof note.text !== "string" || !note.text.trim()) continue;
     byDate.set(note.date, note.text);
   }
@@ -82,10 +83,10 @@ function normalizeNotes(value: unknown): DayNote[] {
 /** Нормализация используется и при чтении localStorage, и при импорте резервной копии. */
 export function normalizeState(value: unknown): AppState {
   const parsed = value && typeof value === "object" && !Array.isArray(value) ? (value as Partial<AppState>) : {};
-  const weights = Array.isArray(parsed.weights) ? parsed.weights : [];
+  const weights = Array.isArray(parsed.weights) ? parsed.weights.filter(validWeight) : [];
   const profile =
-    parsed.profile && typeof parsed.profile === "object" ? normalizeProfile(parsed.profile as Profile, weights) : null;
-  const products = Array.isArray(parsed.products) ? parsed.products : [];
+    validProfile(parsed.profile) ? normalizeProfile(parsed.profile, weights) : null;
+  const products = Array.isArray(parsed.products) ? parsed.products.filter(validProduct) : [];
   const ids = new Set(products.map((product) => product.id));
   const seedById = new Map(SEED_PRODUCTS.map((product) => [product.id, product]));
   // Базовые карточки обновляем из сида: иначе старый неверный штрихкод зефира
@@ -111,40 +112,73 @@ export function normalizeState(value: unknown): AppState {
     ...parsed,
     profile,
     products: [...merged, ...SEED_PRODUCTS.filter((product) => !ids.has(product.id))],
-    meals: Array.isArray(parsed.meals) ? parsed.meals : [],
+    meals: Array.isArray(parsed.meals) ? parsed.meals.filter(validMeal).map((meal) => ({ ...meal, entries: meal.entries.filter(validEntry) })) : [],
     weights,
     notes: normalizeNotes(parsed.notes),
-    recentProductIds: Array.isArray(parsed.recentProductIds) ? parsed.recentProductIds : [],
+    recentProductIds: Array.isArray(parsed.recentProductIds) ? parsed.recentProductIds.filter((id) => typeof id === "string") : [],
     // Корзина: и из localStorage, и из бэкапа берём только корректные позиции,
     // а неразобранное за месяц выбрасываем — чтобы список не пух вечно.
     basket: pruneBasket(sanitizeBasket(parsed.basket), today()),
   };
 }
 
+/** Import is transactional: never replace a diary with an unrelated/invalid JSON file. */
+export function importState(value: unknown): AppState {
+  if (!record(value) || !validProfile(value.profile) ||
+      !Array.isArray(value.products) || !value.products.every(validProduct) ||
+      !Array.isArray(value.meals) || !value.meals.every((m) => validMeal(m) && m.entries.every(validEntry)) ||
+      !Array.isArray(value.weights) || !value.weights.every(validWeight)) {
+    throw new Error("Некорректная резервная копия: проверьте профиль, продукты, приёмы пищи и вес.");
+  }
+  return normalizeState(value);
+}
+
+let storageWarning: string | null = null;
 export function loadState(): AppState {
+  storageWarning = null;
+  let raw: string | null = null;
   try {
-    const raw = localStorage.getItem(KEY);
+    raw = localStorage.getItem(KEY);
     if (!raw) return emptyState;
-    return normalizeState(JSON.parse(raw));
+    const parsed: unknown = JSON.parse(raw);
+    const state = normalizeState(parsed);
+    // Keep an exact recovery copy before sanitizing malformed stored data.
+    if (!record(parsed) || (parsed.profile != null && !validProfile(parsed.profile)) ||
+        (parsed.products != null && (!Array.isArray(parsed.products) || !parsed.products.every(validProduct))) ||
+        (parsed.weights != null && (!Array.isArray(parsed.weights) || !parsed.weights.every(validWeight))) ||
+        (parsed.meals != null && (!Array.isArray(parsed.meals) || !parsed.meals.every((m) => validMeal(m) && m.entries.every(validEntry))))) {
+      localStorage.setItem(`${KEY}-recovery`, raw);
+      storageWarning = "Повреждённые записи исключены. Исходные данные сохранены в резервной записи хранилища.";
+    }
+    return state;
   } catch {
+    if (raw) {
+      try { localStorage.setItem(`${KEY}-recovery`, raw); } catch { /* leave original untouched below */ }
+    }
+    storageWarning = "Не удалось прочитать данные. Автосохранение отключено до перезагрузки. Сохраните резервную копию хранилища перед восстановлением.";
     return emptyState;
   }
 }
 
-export function saveState(s: AppState) {
+export function saveState(s: AppState): boolean {
   try {
     localStorage.setItem(KEY, JSON.stringify(s));
+    return true;
   } catch {
-    /* ignore */
+    return false;
   }
 }
 
 export function usePersistentState() {
   const [state, setState] = useState<AppState>(() => loadState());
+  const [warning, setWarning] = useState(storageWarning);
+  const [blocked] = useState(() => storageWarning?.includes("Автосохранение отключено") ?? false);
   useEffect(() => {
-    saveState(state);
-  }, [state]);
-  return [state, setState] as const;
+    if (blocked) return;
+    if (!saveState(state)) setWarning("Не удалось сохранить изменения на устройстве. Экспортируйте данные в профиле, прежде чем закрывать приложение.");
+    else setWarning(storageWarning);
+  }, [state, blocked]);
+  return [state, setState, warning] as const;
 }
 
 export function uid() {

@@ -9,9 +9,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   base: "./",
-  plugins: [react(), tailwindcss(), viteSingleFile()],
+  plugins: [react(), tailwindcss(), ...(mode === "pages" ? [viteSingleFile()] : [])],
   server: {
     host: "0.0.0.0",
     port: 5173,
@@ -29,4 +29,4 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
     },
   },
-});
+}));

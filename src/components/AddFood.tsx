@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { MealEntry, Product } from "../lib/types";
 import { round } from "../lib/nutrition";
 import { uid } from "../lib/storage";
@@ -6,7 +6,7 @@ import { hasNutrition, lookupBarcode, searchOnline } from "../lib/openfoodfacts"
 import { productMatchesBarcode, sameBarcode } from "../lib/barcode";
 import { searchProducts } from "../lib/search";
 import { Btn, Empty, Field, IconBtn, Sheet, Tabs, noSuggest, numField } from "./ui";
-import Scanner from "./Scanner";
+const Scanner = lazy(() => import("./Scanner"));
 
 type Mode = "search" | "scan" | "form" | "portion";
 type Lib = "recent" | "base";
@@ -412,7 +412,7 @@ export default function AddFood({
   }
 
   /* ---------- сканер ---------- */
-  if (mode === "scan") return <Scanner onDetect={handleCode} onClose={() => (openedDirectlyInScanner ? onClose() : setMode("search"))} />;
+  if (mode === "scan") return <Suspense fallback={<Sheet open onClose={onClose} title="Сканер"><p role="status">Загрузка сканера…</p></Sheet>}><Scanner onDetect={handleCode} onClose={() => (openedDirectlyInScanner ? onClose() : setMode("search"))} /></Suspense>;
 
   /* ---------- создание / редактирование продукта ---------- */
   if (mode === "form") {

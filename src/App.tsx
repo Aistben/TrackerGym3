@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { usePersistentState } from "./lib/storage";
 import { computeTargets, currentWeight, today } from "./lib/nutrition";
 import Onboarding from "./components/Onboarding";
 import DayView from "./components/DayView";
-import Progress from "./components/Progress";
+const Progress = lazy(() => import("./components/Progress"));
 import ProfileView from "./components/ProfileView";
 
 type Tab = "day" | "progress" | "profile";
@@ -44,7 +44,7 @@ const TABS: { key: Tab; icon: (p: { active: boolean }) => React.ReactElement; la
 ];
 
 export default function App() {
-  const [state, setState] = usePersistentState();
+  const [state, setState, storageWarning] = usePersistentState();
   const [tab, setTab] = useState<Tab>("day");
   const [date, setDate] = useState(today());
 
@@ -59,16 +59,20 @@ export default function App() {
   // их порядок после появления профиля.
   if (!state.profile || !targets) {
     return (
+      <>
+      {storageWarning && <p role="alert" className="m-4 rounded-xl bg-red-950 p-4 text-white">{storageWarning}</p>}
       <Onboarding
         onDone={(profile) =>
           setState((s) => ({ ...s, profile, weights: [{ date: today(), weight: profile.startWeight }] }))
         }
       />
+      </>
     );
   }
 
   return (
     <div className="mx-auto min-h-dvh max-w-lg px-4 pt-[max(1rem,env(safe-area-inset-top))]">
+      {storageWarning && <p role="alert" className="mb-4 rounded-xl bg-red-950 p-4 text-white">{storageWarning}</p>}
       {tab === "day" && (
         <DayView
           state={state}
@@ -79,7 +83,9 @@ export default function App() {
         />
       )}
       {tab === "progress" && (
-        <Progress state={state} setState={setState} targets={targets} currentWeight={weight} />
+        <Suspense fallback={<p role="status">Загрузка графика…</p>}>
+          <Progress state={state} setState={setState} targets={targets} currentWeight={weight} />
+        </Suspense>
       )}
       {tab === "profile" && (
         <ProfileView state={state} setState={setState} targets={targets} currentWeight={weight} />

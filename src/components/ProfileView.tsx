@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ActivityKey, AppState, Goal, Macros, Profile, Sex, Targets } from "../lib/types";
 import { ACTIVITY, GOALS, MACRO_STEP, goalShiftText, round, stepMacro } from "../lib/nutrition";
-import { emptyState, normalizeState } from "../lib/storage";
+import { emptyState, importState } from "../lib/storage";
+import { updateProfile } from "../lib/profile";
 import { copyText } from "../lib/clipboard";
 import { buildMyProductsText, myProducts } from "../lib/productsText";
 import { Btn, Field, Select, Sheet, numField } from "./ui";
@@ -30,6 +31,10 @@ export default function ProfileView({
   const fileRef = useRef<HTMLInputElement>(null);
   const productsNoteTimer = useRef<number | null>(null);
 
+  useEffect(() => () => {
+    if (productsNoteTimer.current !== null) window.clearTimeout(productsNoteTimer.current);
+  }, []);
+
   // Свои продукты (не встроенная база): введённые вручную + найденные онлайн.
   const myCount = myProducts(state.products).length;
 
@@ -40,7 +45,7 @@ export default function ProfileView({
     productsNoteTimer.current = window.setTimeout(() => setProductsNote(null), 2500);
   }
 
-  const patch = (d: Partial<Profile>) => setState((s) => ({ ...s, profile: { ...s.profile!, ...d } }));
+  const patch = (d: Partial<Profile>) => setState((s) => updateProfile(s, d));
 
   /* ---------- замок настроек, цель и норма БЖУ ---------- */
   const locked = p.profileSettingsLocked ?? true;
@@ -56,7 +61,7 @@ export default function ProfileView({
 
   /** Без ручных БЖУ норма пересчитывается сразу, с ними — сначала подтверждение. */
   function chooseGoal(goal: Goal) {
-    if (goal === p.goal) return;
+    if (goal === p.goal && !manual) return;
     if (manual) setGoalPending(goal);
     else patch({ goal });
   }
@@ -83,224 +88,133 @@ export default function ProfileView({
     const r = new FileReader();
     r.onload = () => {
       try {
-        setState(normalizeState(JSON.parse(String(r.result))));
-      } catch {
-        alert("Не удалось прочитать файл");
+        setState(importState(JSON.parse(String(r.result))));
+      } catch (error) {
+        alert(error instanceof Error ? error.message : "Не удалось прочитать файл");
       }
     };
     r.readAsText(file);
   }
 
   return (
-    <div className="space-y-4 pb-28">
-      <div className="card flex items-center justify-between gap-3 p-4">
-        <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold">Цель, норма калорий и параметры</h3>
-          <p className="mt-1 text-xs leading-snug text-mute">
-            {locked
-              ? "Настройки скрыты. Разблокируйте, чтобы изменить."
-              : "Настройки открыты. Нажмите замок, чтобы скрыть и защитить их."}
-          </p>
+    <div className="profile-view space-y-3 pb-28">
+      <header className="flex items-center justify-between gap-3 px-1 py-1">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Профиль</h1>
+          <p className="mt-0.5 text-xs text-mute">Параметры и личная норма</p>
         </div>
-        <button
-          type="button"
-          onClick={toggleSettingsLock}
-          title={locked ? "Показать и изменить настройки" : "Скрыть и защитить все настройки"}
+        <button type="button" onClick={toggleSettingsLock} aria-pressed={!locked}
           aria-label={locked ? "Разблокировать цель, норму калорий и параметры" : "Заблокировать цель, норму калорий и параметры"}
-          aria-pressed={locked}
-          className={`grid size-10 shrink-0 place-items-center rounded-full border text-lg transition active:scale-90 ${
-            locked ? "border-acc/60 bg-acc/15 text-acc" : "border-line bg-panel2 text-mute hover:text-ink"
-          }`}
-        >
-          {locked ? "🔒" : "🔓"}
+          className="flex min-h-11 items-center gap-2 rounded-xl border border-line bg-panel2 px-3 text-xs font-medium transition hover:border-acc2/60">
+          <span aria-hidden="true">{locked ? "🔒" : "🔓"}</span>{locked ? "Изменить" : "Готово"}
         </button>
-      </div>
+      </header>
+
+      <section className="card space-y-3 p-4" aria-labelledby="daily-target-title">
+        <div className="flex items-center justify-between gap-2">
+          <h2 id="daily-target-title" className="text-sm font-semibold">Норма на день</h2>
+          <span className={`rounded-full px-2.5 py-1 text-[11px] ${manual ? "bg-warn/10 text-warn" : "bg-acc2/10 text-acc2"}`}>
+            {manual ? "Вручную" : "По формуле"}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <span className="text-4xl font-semibold tracking-tight tabular-nums">{targets.calories}</span>
+          <span className="text-sm text-mute">ккал / день</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {([ ["Белки", macros.protein], ["Жиры", macros.fat], ["Углеводы", macros.carbs] ] as const).map(([label, value]) => (
+            <div key={label} className="rounded-xl bg-panel2/60 px-2 py-2.5 text-center">
+              <div className="text-[11px] text-mute">{label}</div>
+              <div className="mt-0.5 text-lg font-semibold tabular-nums">{value}<span className="ml-1 text-xs font-normal text-mute">г</span></div>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-mute">{GOALS[p.goal].label} · {round(currentWeight, 1)} кг{!manual && " · Миффлин–Сан Жеор"}</p>
+        {!locked && (
+          <div className="space-y-2 border-t border-line/60 pt-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-xs font-medium text-mute">Настроить БЖУ</h3>
+              <Btn variant="ghost" size="sm" disabled={!manual} onClick={() => patch({ macroTargets: undefined })}>↺ По цели</Btn>
+            </div>
+            <MacroRow label="Белки" step={MACRO_STEP.protein} value={macros.protein} onCommit={(value) => setMacro("protein", value)} />
+            <MacroRow label="Жиры" step={MACRO_STEP.fat} value={macros.fat} onCommit={(value) => setMacro("fat", value)} />
+            <MacroRow label="Углеводы" step={MACRO_STEP.carbs} value={macros.carbs} onCommit={(value) => setMacro("carbs", value)} />
+            <p className="text-[11px] leading-relaxed text-mute">{manual ? "БЖУ фиксированы. «По цели» вернёт автоматический расчёт." : "Правка БЖУ включает ручной режим."}</p>
+            <details className="text-xs text-mute">
+              <summary className="cursor-pointer py-2">Как считается норма</summary>
+              <div className="space-y-2 pb-1 leading-relaxed">
+                <p>Основной обмен (BMR): {targets.bmr} ккал. Расход с активностью (TDEE): {targets.tdee} ккал.</p>
+                <p>По цели: {goalShiftText(p.goal)}, белок {proteinPerKgText(p.goal)} г/кг. Калории из БЖУ: белки и углеводы — 4 ккал/г, жиры — 9 ккал/г.</p>
+                <p>Шаг кнопок: белки ±10 г, жиры ±5 г, углеводы ±100 г. Значения можно вписать вручную.</p>
+              </div>
+            </details>
+          </div>
+        )}
+      </section>
 
       {!locked && (
         <>
-          <div className="card space-y-3 p-4">
-            <h3 className="text-sm font-semibold">Цель</h3>
-            <div className="grid grid-cols-3 gap-2">
-              {(Object.keys(GOALS) as Goal[]).map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  aria-pressed={p.goal === g}
-                  onClick={() => chooseGoal(g)}
-                  className={`rounded-xl border px-2 py-3 text-center text-xs leading-tight transition active:scale-[0.97] ${
-                    p.goal === g ? "border-acc bg-acc/10 text-acc" : "border-line bg-panel2 hover:border-acc2/40"
-                  }`}
-                >
-                  <div className="text-lg">{GOALS[g].emoji}</div>
-                  <span className="mt-1 block text-[11px] leading-tight">{GOALS[g].label}</span>
+          <section className="card space-y-3 p-4" aria-labelledby="parameters-title">
+            <h2 id="parameters-title" className="text-sm font-semibold">Параметры тела</h2>
+            <div className="grid grid-cols-2 gap-2" role="group" aria-label="Пол">
+              {(["male", "female"] as Sex[]).map((sex) => (
+                <button key={sex} type="button" aria-pressed={p.sex === sex} onClick={() => patch({ sex })}
+                  className={`min-h-11 rounded-xl border text-sm transition ${p.sex === sex ? "border-acc/60 bg-acc/10 text-ink" : "border-line bg-panel2/40 text-mute"}`}>
+                  {sex === "male" ? "Мужчина" : "Женщина"}
                 </button>
               ))}
             </div>
-            <p className="text-xs leading-snug text-mute">
-              {GOALS[p.goal].desc}. База нормы: {goalShiftText(p.goal)}, белок {proteinPerKgText(p.goal)} г на кг веса.
-            </p>
-          </div>
-
-          <div className="card space-y-3 p-4">
-            <h3 className="text-sm font-semibold">Норма калорий и БЖУ</h3>
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <Mini label="BMR" value={targets.bmr} />
-              <Mini label="TDEE" value={targets.tdee} />
-              <Mini label="Калории" value={targets.calories} accent />
-            </div>
-
-            <div className="space-y-2">
-              <MacroRow
-                label="Белки"
-                step={MACRO_STEP.protein}
-                value={macros.protein}
-                onCommit={(value) => setMacro("protein", value)}
-              />
-              <MacroRow label="Жиры" step={MACRO_STEP.fat} value={macros.fat} onCommit={(value) => setMacro("fat", value)} />
-              <MacroRow
-                label="Углеводы"
-                step={MACRO_STEP.carbs}
-                value={macros.carbs}
-                onCommit={(value) => setMacro("carbs", value)}
-              />
-            </div>
-
-            <div className="rounded-xl border border-acc2/20 bg-acc2/8 p-3 text-xs leading-relaxed text-mute">
-              <span className="font-semibold text-acc2">Норму задаёшь ты:</span> «−» и «+» меняют цифру на шаг (белки ±10, жиры ±5, углеводы ±100 г), а саму цифру можно вписать с клавиатуры. Калории считаются из БЖУ: белки и углеводы — по 4 ккал/г, жиры — 9 ккал/г.
-            </div>
-
-            <div className="flex items-center justify-between gap-3">
-              <p className="min-w-0 text-xs leading-snug text-mute">
-                {manual
-                  ? "Свои БЖУ, заданы руками. «↺ По цели» вернёт расчёт по цели."
-                  : `Расчёт по цели «${GOALS[p.goal].label}», формула Миффлина–Сан Жеора, вес текущий ${round(currentWeight, 1)} кг.`}
-              </p>
-              <Btn
-                variant="soft"
-                size="sm"
-                title="Вернуть норму, рассчитанную по цели"
-                disabled={!manual}
-                onClick={() => patch({ macroTargets: undefined })}
-                className="shrink-0 whitespace-nowrap"
-              >
-                ↺ По цели
-              </Btn>
-            </div>
-          </div>
-
-          <div className="card space-y-3 p-4">
-            <h3 className="text-sm font-semibold">Параметры</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {(["male", "female"] as Sex[]).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => patch({ sex: s })}
-                  className={`rounded-xl border py-2 text-sm font-medium transition active:scale-[0.97] ${
-                    p.sex === s ? "border-acc bg-acc/10 text-acc" : "border-line bg-panel2 hover:border-acc2/40"
-                  }`}
-                >
-                  {s === "male" ? "Мужчина" : "Женщина"}
-                </button>
-              ))}
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <Field label="Возраст">
-                <input className="field compact" inputMode="numeric" type="number" min={13} max={100} value={p.age} onChange={(e) => patch({ age: +e.target.value || 0 })} />
-              </Field>
-              <Field label="Рост, см">
-                <input
-                  className="field compact"
-                  inputMode="numeric"
-                  type="number"
-                  min={100}
-                  max={250}
-                  value={p.height}
-                  onChange={(e) => patch({ height: +e.target.value || 0 })}
-                />
-              </Field>
-              <Field label="Стартовый вес, кг">
-                <input
-                  className="field compact"
-                  inputMode="decimal"
-                  type="number"
-                  min={20}
-                  max={400}
-                  step="0.1"
-                  value={p.startWeight}
-                  onChange={(e) => patch({ startWeight: +e.target.value.replace(",", ".") || 0 })}
-                />
-              </Field>
+            <div className="profile-parameters">
+              <label><span>Возраст <small>лет</small></span><ParameterInput value={p.age} min={13} max={100} onCommit={(age) => patch({ age })} /></label>
+              <label><span>Рост <small>см</small></span><ParameterInput value={p.height} min={100} max={250} onCommit={(height) => patch({ height })} /></label>
+              <label><span>Вес <small>кг</small></span><ParameterInput value={currentWeight} min={20} max={400} step={0.1} onCommit={(startWeight) => patch({ startWeight })} /></label>
             </div>
             <Field label="Активность">
-              <Select
-                value={p.activity}
-                onChange={(activity) => patch({ activity })}
-                options={(Object.keys(ACTIVITY) as ActivityKey[]).map((a) => ({
-                  key: a,
-                  label: ACTIVITY[a].label,
-                  hint: ACTIVITY[a].hint,
-                }))}
-              />
+              <Select value={p.activity} onChange={(activity) => patch({ activity })}
+                options={(Object.keys(ACTIVITY) as ActivityKey[]).map((a) => ({ key: a, label: ACTIVITY[a].label, hint: ACTIVITY[a].hint }))} />
             </Field>
-          </div>
+            <p className="text-[11px] leading-relaxed text-mute">Вес сохраняется за сегодня. {manual ? "Для пересчёта БЖУ нажми «По цели»." : "Норма пересчитывается автоматически."}</p>
+          </section>
+
+          <section className="card space-y-3 p-4" aria-labelledby="goal-title">
+            <h2 id="goal-title" className="text-sm font-semibold">Цель питания</h2>
+            <div className="grid grid-cols-3 gap-2" role="group" aria-label="Цель питания">
+              {(Object.keys(GOALS) as Goal[]).map((g) => (
+                <button key={g} type="button" aria-pressed={p.goal === g} onClick={() => chooseGoal(g)}
+                  className={`flex min-h-14 items-center justify-center rounded-xl border px-1 py-2 text-center text-xs leading-snug transition ${p.goal === g ? "border-acc/60 bg-acc/10 text-ink" : "border-line bg-panel2/40 text-mute"}`}>
+                  {GOALS[g].label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-mute">{goalShiftText(p.goal)} · белок {proteinPerKgText(p.goal)} г/кг</p>
+          </section>
         </>
       )}
 
-      <div className="card space-y-2 p-4">
-        <h3 className="text-sm font-semibold">Данные</h3>
-        <div className="grid grid-cols-3 gap-1.5">
-          <Btn
-            variant="soft"
-            size="sm"
-            title="Сохранить данные в файл"
-            onClick={exportData}
-            className="min-w-0 min-h-9 whitespace-nowrap !gap-1 !px-1 !py-2 text-[11px] leading-none max-[360px]:text-[10px]"
-          >
-            Сохранить
-          </Btn>
-          <Btn
-            variant="soft"
-            size="sm"
-            title="Загрузить данные из файла"
-            onClick={() => fileRef.current?.click()}
-            className="min-w-0 min-h-9 whitespace-nowrap !gap-1 !px-1 !py-2 text-[11px] leading-none max-[360px]:text-[10px]"
-          >
-            Загрузить
-          </Btn>
-          <Btn
-            variant="danger"
-            size="sm"
-            title="Сбросить все данные"
-            onClick={() => setResetOpen(true)}
-            className="min-w-0 min-h-9 whitespace-nowrap !gap-1 !px-1 !py-2 text-[11px] leading-none max-[360px]:text-[10px]"
-          >
-            Сбросить
-          </Btn>
+      <section className="card space-y-3 p-4" aria-labelledby="data-title">
+        <div>
+          <h2 id="data-title" className="text-sm font-semibold">Мои данные</h2>
+          <p className="mt-1 text-[11px] text-mute">Хранятся на этом устройстве</p>
         </div>
-        <Btn
-          variant="soft"
-          size="sm"
-          title="Скопировать текстом свои продукты с БЖУ на 100 г (встроенная база не копируется)"
-          disabled={!myCount}
-          onClick={copyMyProducts}
-          className="min-h-9 w-full whitespace-nowrap !px-1 !py-2 text-[11px] leading-none max-[360px]:text-[10px]"
-        >
-          📋 Скопировать мои продукты{myCount ? ` (${myCount})` : ""}
+        <div className="grid grid-cols-2 gap-2">
+          <Btn variant="soft" size="sm" className="min-h-11" title="Сохранить резервную копию JSON" onClick={exportData}>Сохранить копию</Btn>
+          <Btn variant="soft" size="sm" className="min-h-11" title="Загрузить резервную копию JSON" onClick={() => fileRef.current?.click()}>Загрузить копию</Btn>
+        </div>
+        <Btn variant="ghost" size="sm" disabled={!myCount} onClick={copyMyProducts} className="min-h-11 w-full">
+          Скопировать мои продукты · {myCount}
         </Btn>
-        <p aria-live="polite" className={`text-xs leading-snug ${productsNote ? "text-acc" : "text-mute"}`}>
-          {productsNote ??
-            (myCount
-              ? "Текстом: название, бренд и БЖУ на 100 г — только ваши продукты (введённые вручную и найденные онлайн), без встроенной базы."
-              : "Своих продуктов пока нет: они появятся, когда добавишь продукт вручную или найдёшь по штрихкоду.")}
-        </p>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="application/json"
-          hidden
-          onChange={(e) => e.target.files?.[0] && importData(e.target.files[0])}
-        />
-      </div>
+        <p role="status" className="text-[11px] text-mute">{productsNote ?? (!myCount ? "Здесь появятся продукты, добавленные тобой." : "Название и БЖУ текстом, без встроенной базы.")}</p>
+        <details className="border-t border-line/60 pt-2 text-xs text-mute">
+          <summary className="cursor-pointer py-2">Удаление данных</summary>
+          <p className="py-2 leading-relaxed">Сброс удалит профиль, дневник и историю веса. Сначала сохрани копию.</p>
+          <Btn variant="danger" size="sm" className="min-h-11 w-full" onClick={() => setResetOpen(true)}>Сбросить все данные</Btn>
+        </details>
+        <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) importData(file);
+          e.target.value = "";
+        }} />
+      </section>
 
       <Sheet open={goalPending !== null} onClose={() => setGoalPending(null)} title="Заменить норму БЖУ?" center>
         {goalPending && (
@@ -422,11 +336,18 @@ function MacroRow({
   );
 }
 
-function Mini({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
-  return (
-    <div className="rounded-xl border border-line bg-panel2 py-3">
-      <div className={`text-lg font-bold ${accent ? "text-acc" : ""}`}>{value}</div>
-      <div className="text-[11px] text-mute">{label}</div>
-    </div>
-  );
+/** Keep an empty draft while typing, but never put zero/NaN into persisted settings. */
+function ParameterInput({ value, min, max, step = 1, onCommit }: {
+  value: number; min: number; max: number; step?: number; onCommit: (value: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  return <input className="field compact" type="number" inputMode={step < 1 ? "decimal" : "numeric"}
+    min={min} max={max} step={step} value={draft ?? value}
+    onChange={(event) => {
+      const text = event.target.value;
+      setDraft(text);
+      const number = Number(text.replace(",", "."));
+      if (text.trim() && Number.isFinite(number) && number >= min && number <= max && (step < 1 || Number.isInteger(number))) onCommit(number);
+    }}
+    onBlur={() => setDraft(null)} />;
 }

@@ -83,3 +83,42 @@ test("одно взвешивание даёт одну точку, а не пу
   assert.equal(series.at(-1)?.факт, 78.9);
   assert.equal(series.filter((point) => point.факт != null).length, 1);
 });
+
+test("автоматический график: пять месяцев без переключателей и без будущих записей", async () => {
+  const { progressWindow } = await import("../src/lib/progress");
+  const weights = [
+    { date: "2026-01-01", weight: 85 },
+    { date: "2026-06-14", weight: 83 },
+    { date: "2026-10-01", weight: 81 },
+    { date: "2026-11-14", weight: 80 },
+    { date: "2026-12-01", weight: 79 },
+  ];
+  const result = progressWindow(weights, "2026-11-14");
+  assert.equal(result.start, "2026-06-14");
+  assert.equal(result.end, "2026-11-14");
+  assert.equal(result.points.length, 3);
+  assert.equal(result.points.at(-1)?.факт, 80);
+  assert.equal(weights.length, 5, "история не удаляется");
+  assert.deepEqual(progressWindow(weights, "2026-11-14"), result, "повторное открытие не сбрасывает период");
+});
+
+test("график автоматически сдвигается при смене месяца и новом взвешивании", async () => {
+  const { progressWindow } = await import("../src/lib/progress");
+  const weights = [{ date: "2026-06-30", weight: 82 }, { date: "2026-11-30", weight: 80 }];
+  assert.equal(progressWindow(weights, "2026-11-30").points.length, 2);
+  const next = progressWindow([...weights, { date: "2026-12-01", weight: 79 }], "2026-12-01");
+  assert.equal(next.start, "2026-07-01");
+  assert.equal(next.points.length, 2);
+  assert.equal(next.points.at(-1)?.факт, 79);
+});
+
+test("давняя запись видна без ручной настройки; пустая история безопасна", async () => {
+  const { progressWindow, fiveMonthsBefore } = await import("../src/lib/progress");
+  const result = progressWindow([{ date: "2024-02-29", weight: 80 }], "2026-11-14");
+  assert.equal(result.historical, true);
+  assert.equal(result.end, "2024-02-29");
+  assert.equal(result.points.length, 1);
+  assert.deepEqual(progressWindow([], "2026-11-14").points, []);
+  assert.equal(fiveMonthsBefore("2026-07-31"), "2026-02-28");
+  assert.equal(fiveMonthsBefore("2024-07-31"), "2024-02-29");
+});
